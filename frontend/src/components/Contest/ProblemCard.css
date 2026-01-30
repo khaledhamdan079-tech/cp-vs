@@ -63,3 +63,41 @@
   color: #28a745;
   font-size: 0.9rem;
 }
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+  .problem-card {
+    padding: 1rem;
+  }
+
+  .problem-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .problem-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .problem-link {
+    width: 100%;
+    text-align: center;
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .problem-card {
+    padding: 0.75rem;
+  }
+
+  .problem-header h3 {
+    font-size: 1rem;
+  }
+
+  .problem-code {
+    font-size: 0.85rem;
+    word-break: break-all;
+  }
+}

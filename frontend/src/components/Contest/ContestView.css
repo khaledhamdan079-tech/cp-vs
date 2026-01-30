@@ -131,3 +131,54 @@
 .error-container a:hover {
   text-decoration: underline;
 }
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+  .contest-view {
+    padding: 1rem;
+  }
+
+  .contest-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .contest-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .contest-meta {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .contest-info {
+    padding: 1rem;
+  }
+
+  .problems-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .waiting-message {
+    padding: 1.5rem;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .contest-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .badge {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  .contest-info p {
+    font-size: 0.9rem;
+  }
+}

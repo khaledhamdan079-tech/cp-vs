@@ -79,3 +79,33 @@
   background-color: #ccc;
   cursor: not-allowed;
 }
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+  .create-challenge {
+    padding: 1rem;
+  }
+
+  .create-challenge h1 {
+    font-size: 1.5rem;
+  }
+
+  .challenge-form {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .create-challenge h1 {
+    font-size: 1.25rem;
+  }
+
+  .challenge-form {
+    padding: 1rem;
+  }
+
+  .form-group select,
+  .form-group input[type="datetime-local"] {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}

@@ -114,3 +114,67 @@
   background: #ccc;
   cursor: not-allowed;
 }
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+  .leaderboard-page {
+    padding: 1rem;
+  }
+
+  .leaderboard-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .search-box {
+    max-width: 100%;
+  }
+
+  .leaderboard-container {
+    padding: 1rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .leaderboard-table {
+    min-width: 500px;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .rank {
+    width: 50px;
+  }
+
+  .user-link {
+    font-size: 1rem;
+  }
+
+  .rating {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .leaderboard-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .leaderboard-table {
+    min-width: 400px;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 0.5rem 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-load-more {
+    width: 100%;
+    padding: 0.75rem 1rem;
+  }
+}

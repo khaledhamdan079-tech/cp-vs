@@ -102,3 +102,30 @@
 .dropdown-item.no-results:hover {
   background-color: white;
 }
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+  .user-search-input {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  .user-dropdown {
+    max-height: 150px;
+  }
+
+  .dropdown-item {
+    padding: 0.75rem;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-dropdown {
+    max-height: 120px;
+  }
+
+  .dropdown-item {
+    padding: 0.6rem;
+    font-size: 0.9rem;
+  }
+}
