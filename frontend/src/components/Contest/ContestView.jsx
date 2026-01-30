@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import apiClient from '../../api/client';
 import ProblemCard from './ProblemCard';
 import Leaderboard from './Leaderboard';
@@ -8,6 +9,7 @@ import './ContestView.css';
 
 const ContestView = () => {
   const { contestId } = useParams();
+  const { user } = useAuth();
   const [contest, setContest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -113,7 +115,13 @@ const ContestView = () => {
             ) : (
               <div className="problems-grid">
                 {contest.problems.map((problem) => (
-                  <ProblemCard key={problem.id} problem={problem} />
+                  <ProblemCard 
+                    key={problem.id} 
+                    problem={problem}
+                    currentUserId={user?.id}
+                    user1Id={contest.user1_id}
+                    user2Id={contest.user2_id}
+                  />
                 ))}
               </div>
             )}

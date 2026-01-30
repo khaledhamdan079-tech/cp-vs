@@ -61,6 +61,35 @@
   color: #4a9eff;
 }
 
+.navbar-link-with-badge {
+  position: relative;
+}
+
+.pending-badge {
+  position: absolute;
+  top: -8px;
+  right: -12px;
+  background-color: #dc3545;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: bold;
+  border: 2px solid #1a1a1a;
+  min-width: 20px;
+  padding: 0 4px;
+}
+
+.pending-badge:empty {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+}
+
 .navbar-profile-link {
   color: #4a9eff;
   font-weight: 500;
@@ -125,6 +154,12 @@
     padding: 0.75rem 0;
     font-size: 1.1rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .pending-badge {
+    position: static;
+    margin-left: 0.5rem;
+    display: inline-flex;
   }
 
   .navbar-user {

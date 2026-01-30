@@ -105,11 +105,16 @@ const UserSearch = ({ onSelect, selectedUser }) => {
             users.map((user) => (
               <div
                 key={user.id}
-                className="dropdown-item"
+                className={`dropdown-item ${selectedUser?.id === user.id ? 'selected' : ''}`}
                 onClick={() => handleSelect(user)}
                 onMouseDown={(e) => e.preventDefault()} // Prevent input blur
               >
-                {user.handle}
+                <div className="user-item-content">
+                  <span className="user-handle">{user.handle}</span>
+                  {user.rating && (
+                    <span className="user-rating">Rating: {user.rating}</span>
+                  )}
+                </div>
               </div>
             ))
           )}

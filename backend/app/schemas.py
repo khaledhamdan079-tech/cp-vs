@@ -156,6 +156,7 @@ class ContestResponse(BaseModel):
 class UserSearchResponse(BaseModel):
     id: UUID
     handle: str
+    rating: int
 
     class Config:
         from_attributes = True

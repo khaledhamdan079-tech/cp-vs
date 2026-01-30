@@ -43,6 +43,21 @@ async def create_challenge(
             detail="Cannot challenge yourself"
         )
     
+    # Check for existing pending challenge between the same two users (in either direction)
+    existing_pending = db.query(Challenge).filter(
+        Challenge.status == ChallengeStatus.PENDING,
+        or_(
+            (Challenge.challenger_id == current_user.id) & (Challenge.challenged_id == challenged_user.id),
+            (Challenge.challenger_id == challenged_user.id) & (Challenge.challenged_id == current_user.id)
+        )
+    ).first()
+    
+    if existing_pending:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="There is already a pending challenge between you and this user. Please wait for it to be accepted or rejected."
+        )
+    
     # Check for overlapping contests for both users
     # Contest duration is 2 hours
     proposed_start_time = challenge_data.suggested_start_time
@@ -110,6 +125,20 @@ async def list_challenges(
     ).order_by(Challenge.created_at.desc()).all()
     
     return challenges
+
+
+@router.get("/pending-count")
+async def get_pending_challenges_count(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get count of pending challenges received by the current user"""
+    count = db.query(Challenge).filter(
+        Challenge.challenged_id == current_user.id,
+        Challenge.status == ChallengeStatus.PENDING
+    ).count()
+    
+    return {"count": count}
 
 
 @router.post("/{challenge_id}/accept", response_model=ChallengeResponse)

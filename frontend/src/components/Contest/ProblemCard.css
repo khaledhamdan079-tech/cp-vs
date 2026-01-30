@@ -16,6 +16,11 @@
   background-color: #f0fff4;
 }
 
+.problem-card.solved-by-opponent {
+  border-color: #dc3545;
+  background-color: #fff5f5;
+}
+
 .problem-header {
   display: flex;
   justify-content: space-between;
@@ -35,6 +40,10 @@
   border-radius: 12px;
   font-size: 0.75rem;
   font-weight: bold;
+}
+
+.solved-badge.opponent {
+  background-color: #dc3545;
 }
 
 .problem-link {
@@ -62,6 +71,10 @@
   margin-top: 0.5rem;
   color: #28a745;
   font-size: 0.9rem;
+}
+
+.solved-time.opponent {
+  color: #dc3545;
 }
 
 /* Mobile Styles */
