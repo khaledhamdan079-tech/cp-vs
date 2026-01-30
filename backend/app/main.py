@@ -4,8 +4,12 @@ from contextlib import asynccontextmanager
 from .database import engine, Base
 from .routers import auth, users, challenges, contests
 from .submission_checker import start_scheduler
+from .migrations import run_migrations
 
-# Create tables
+# Run migrations first (adds new columns to existing tables)
+run_migrations()
+
+# Create tables (creates new tables if they don't exist)
 Base.metadata.create_all(bind=engine)
 
 

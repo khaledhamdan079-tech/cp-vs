@@ -23,3 +23,13 @@ wheels/
 *.egg
 .env
 .venv
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+cpvs.db
+
+# Logs
+*.log
+logs/
