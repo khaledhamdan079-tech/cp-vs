@@ -18,6 +18,8 @@ const Navbar = () => {
           CP VS
         </Link>
         <div className="navbar-links">
+          <Link to="/">Home</Link>
+          <Link to="/leaderboard">Leaderboard</Link>
           {user ? (
             <>
               <Link to="/dashboard">Dashboard</Link>

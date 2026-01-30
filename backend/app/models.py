@@ -65,6 +65,7 @@ class User(Base):
     id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     handle = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    rating = Column(Integer, default=1000, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -72,6 +73,7 @@ class User(Base):
     challenges_received = relationship("Challenge", foreign_keys="Challenge.challenged_id", back_populates="challenged")
     contests_user1 = relationship("Contest", foreign_keys="Contest.user1_id", back_populates="user1")
     contests_user2 = relationship("Contest", foreign_keys="Contest.user2_id", back_populates="user2")
+    rating_history = relationship("RatingHistory", back_populates="user")
 
 
 class Challenge(Base):
@@ -110,6 +112,7 @@ class Contest(Base):
     user2 = relationship("User", foreign_keys=[user2_id], back_populates="contests_user2")
     problems = relationship("ContestProblem", back_populates="contest", cascade="all, delete-orphan")
     scores = relationship("ContestScore", back_populates="contest", cascade="all, delete-orphan")
+    rating_history = relationship("RatingHistory", back_populates="contest")
 
 
 class ContestProblem(Base):
@@ -142,3 +145,19 @@ class ContestScore(Base):
     # Relationships
     contest = relationship("Contest", back_populates="scores")
     user = relationship("User")
+
+
+class RatingHistory(Base):
+    __tablename__ = "rating_history"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    contest_id = Column(GUID(), ForeignKey("contests.id"), nullable=False)
+    rating_before = Column(Integer, nullable=False)
+    rating_after = Column(Integer, nullable=False)
+    rating_change = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="rating_history")
+    contest = relationship("Contest", back_populates="rating_history")

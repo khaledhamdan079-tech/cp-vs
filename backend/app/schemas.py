@@ -7,14 +7,30 @@ from uuid import UUID
 # User schemas
 class UserBase(BaseModel):
     handle: str
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "handle": "tourist"
+            }
+        }
 
 
 class UserCreate(UserBase):
     password: str
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "handle": "tourist",
+                "password": "securepassword123"
+            }
+        }
 
 
 class UserResponse(UserBase):
     id: UUID
+    rating: int
     created_at: datetime
 
     @field_serializer('created_at')
@@ -140,6 +156,67 @@ class ContestResponse(BaseModel):
 class UserSearchResponse(BaseModel):
     id: UUID
     handle: str
+
+    class Config:
+        from_attributes = True
+
+
+# Leaderboard schema
+class LeaderboardEntryResponse(BaseModel):
+    rank: int
+    handle: str
+    rating: int
+    id: UUID
+
+    class Config:
+        from_attributes = True
+
+
+# User profile schema
+class UserProfileResponse(BaseModel):
+    id: UUID
+    handle: str
+    rating: int
+    created_at: datetime
+    total_contests: int
+    wins: int
+    losses: int
+    draws: int
+    win_rate: float
+
+    @field_serializer('created_at')
+    def serialize_datetime(self, dt: datetime, _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+    class Config:
+        from_attributes = True
+
+
+# Public contest schema (without sensitive data)
+class PublicContestResponse(BaseModel):
+    id: UUID
+    user1_handle: str
+    user2_handle: str
+    difficulty: int
+    start_time: datetime
+    end_time: datetime
+    status: str
+    user1_points: int
+    user2_points: int
+    user1_rating_change: Optional[int] = None
+    user2_rating_change: Optional[int] = None
+
+    @field_serializer('start_time', 'end_time')
+    def serialize_datetime(self, dt: datetime, _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
 
     class Config:
         from_attributes = True

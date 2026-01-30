@@ -2,9 +2,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
+import asyncio
+from uuid import UUID
 from .database import SessionLocal
-from .models import Contest, ContestProblem, ContestScore, ContestStatus, User
+from .models import Contest, ContestProblem, ContestScore, ContestStatus, User, RatingHistory
 from .codeforces_api import cf_api
+from .rating import calculate_elo_rating, determine_contest_scores
 
 
 scheduler = AsyncIOScheduler()
@@ -58,6 +61,85 @@ def recalculate_contest_scores(contest_id, db: Session):
     db.commit()
 
 
+def update_ratings_after_contest(contest_id, db: Session):
+    """Update user ratings after a contest is completed"""
+    # Convert contest_id to UUID if it's a string
+    if isinstance(contest_id, str):
+        try:
+            contest_id = UUID(contest_id)
+        except ValueError:
+            pass
+    
+    contest = db.query(Contest).filter(Contest.id == contest_id).first()
+    if not contest or contest.status != ContestStatus.COMPLETED:
+        return
+    
+    # Get final scores for both users
+    score1 = db.query(ContestScore).filter(
+        ContestScore.contest_id == contest.id,
+        ContestScore.user_id == contest.user1_id
+    ).first()
+    score2 = db.query(ContestScore).filter(
+        ContestScore.contest_id == contest.id,
+        ContestScore.user_id == contest.user2_id
+    ).first()
+    
+    if not score1 or not score2:
+        return
+    
+    # Get users
+    user1 = db.query(User).filter(User.id == contest.user1_id).first()
+    user2 = db.query(User).filter(User.id == contest.user2_id).first()
+    
+    if not user1 or not user2:
+        return
+    
+    # Check if ratings have already been updated for this contest
+    existing_history = db.query(RatingHistory).filter(
+        RatingHistory.contest_id == contest.id
+    ).first()
+    
+    if existing_history:
+        # Ratings already updated for this contest
+        return
+    
+    # Get current ratings
+    rating1_before = user1.rating
+    rating2_before = user2.rating
+    
+    # Determine Elo scores based on points
+    elo_score1, elo_score2 = determine_contest_scores(score1.total_points, score2.total_points)
+    
+    # Calculate new ratings
+    new_rating1, new_rating2, rating_change1, rating_change2 = calculate_elo_rating(
+        rating1_before, rating2_before, elo_score1, elo_score2
+    )
+    
+    # Update user ratings
+    user1.rating = new_rating1
+    user2.rating = new_rating2
+    
+    # Create rating history entries
+    history1 = RatingHistory(
+        user_id=user1.id,
+        contest_id=contest.id,
+        rating_before=rating1_before,
+        rating_after=new_rating1,
+        rating_change=rating_change1
+    )
+    history2 = RatingHistory(
+        user_id=user2.id,
+        contest_id=contest.id,
+        rating_before=rating2_before,
+        rating_after=new_rating2,
+        rating_change=rating_change2
+    )
+    
+    db.add(history1)
+    db.add(history2)
+    db.commit()
+
+
 async def check_contest_submissions(contest_id):
     """Check submissions for a specific contest"""
     from uuid import UUID
@@ -92,39 +174,56 @@ async def check_contest_submissions(contest_id):
         
         # Check submissions for each problem
         for problem in problems:
-            # Check user1
             if not problem.solved_by:
-                submission = await cf_api.check_submission(
+                # Check both users simultaneously
+                submission1_task = cf_api.check_submission(
                     user1.handle,
                     problem.problem_code,
                     start_timestamp
                 )
-                if submission:
-                    problem.solved_by = user1.id
-                    problem.solved_at = datetime.utcnow()
-                    db.commit()
-                    # Recalculate scores to ensure accuracy
-                    recalculate_contest_scores(contest.id, db)
-                    continue
-            
-            # Check user2
-            if not problem.solved_by:
-                submission = await cf_api.check_submission(
+                submission2_task = cf_api.check_submission(
                     user2.handle,
                     problem.problem_code,
                     start_timestamp
                 )
-                if submission:
-                    problem.solved_by = user2.id
-                    problem.solved_at = datetime.utcnow()
+                
+                # Wait for both checks to complete
+                submission1, submission2 = await asyncio.gather(submission1_task, submission2_task)
+                
+                # Determine who solved first based on timestamps
+                if submission1 and submission2:
+                    # Both solved - compare timestamps
+                    time1 = submission1.get("creationTimeSeconds", 0)
+                    time2 = submission2.get("creationTimeSeconds", 0)
+                    if time1 <= time2:
+                        # User1 solved first (or at same time, tie goes to user1)
+                        problem.solved_by = user1.id
+                        problem.solved_at = datetime.fromtimestamp(time1)
+                    else:
+                        # User2 solved first
+                        problem.solved_by = user2.id
+                        problem.solved_at = datetime.fromtimestamp(time2)
                     db.commit()
-                    # Recalculate scores to ensure accuracy
+                    recalculate_contest_scores(contest.id, db)
+                elif submission1:
+                    # Only user1 solved
+                    problem.solved_by = user1.id
+                    problem.solved_at = datetime.fromtimestamp(submission1.get("creationTimeSeconds", datetime.utcnow().timestamp()))
+                    db.commit()
+                    recalculate_contest_scores(contest.id, db)
+                elif submission2:
+                    # Only user2 solved
+                    problem.solved_by = user2.id
+                    problem.solved_at = datetime.fromtimestamp(submission2.get("creationTimeSeconds", datetime.utcnow().timestamp()))
+                    db.commit()
                     recalculate_contest_scores(contest.id, db)
         
         # Check if contest should be completed
         if datetime.utcnow() >= contest.end_time:
             contest.status = ContestStatus.COMPLETED
             db.commit()
+            # Update ratings after contest completion
+            update_ratings_after_contest(contest.id, db)
             # Remove from scheduler
             scheduler.remove_job(f"check_contest_{contest.id}")
     

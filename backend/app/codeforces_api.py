@@ -97,6 +97,18 @@ class CodeforcesAPI:
         params = {"handles": ";".join(handles)}
         return await self._make_request("user.info", params)
 
+    async def validate_handle(self, handle: str) -> bool:
+        """Validate if a Codeforces handle exists"""
+        try:
+            params = {"handles": handle}
+            result = await self._make_request("user.info", params)
+            # If we get a result and it's a list with at least one user, handle is valid
+            return isinstance(result, list) and len(result) > 0
+        except Exception as e:
+            # If API returns error (e.g., handle not found), return False
+            print(f"Error validating handle {handle}: {e}")
+            return False
+
     async def check_submission(self, handle: str, problem_code: str, since: int) -> Optional[Dict]:
         """Check if user has solved a specific problem since a given timestamp"""
         try:

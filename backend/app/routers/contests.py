@@ -1,18 +1,183 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timedelta
 from ..database import get_db
 from ..models import (
-    User, Challenge, Contest, ContestProblem, ContestScore,
+    User, Challenge, Contest, ContestProblem, ContestScore, RatingHistory,
     ChallengeStatus, ContestStatus
 )
-from ..schemas import ContestResponse, ContestProblemResponse, ContestScoreResponse
+from ..schemas import ContestResponse, ContestProblemResponse, ContestScoreResponse, PublicContestResponse
 from ..dependencies import get_current_user
 from ..problem_selector import get_unsolved_problems
-from sqlalchemy import or_
+from sqlalchemy import or_, func, desc
 
 router = APIRouter(prefix="/api/contests", tags=["contests"])
+
+
+# Public endpoints (no authentication required)
+public_router = APIRouter(prefix="/api/contests/public", tags=["contests-public"])
+
+
+@public_router.get("/latest", response_model=List[PublicContestResponse])
+async def get_latest_contests(
+    limit: int = Query(10, ge=1, le=50, description="Number of contests to return"),
+    db: Session = Depends(get_db)
+):
+    """Get latest completed contests (public endpoint)"""
+    contests = db.query(Contest).filter(
+        Contest.status == ContestStatus.COMPLETED
+    ).order_by(Contest.end_time.desc()).limit(limit).all()
+    
+    result = []
+    for contest in contests:
+        user1 = db.query(User).filter(User.id == contest.user1_id).first()
+        user2 = db.query(User).filter(User.id == contest.user2_id).first()
+        
+        # Get final scores
+        score1 = db.query(ContestScore).filter(
+            ContestScore.contest_id == contest.id,
+            ContestScore.user_id == contest.user1_id
+        ).first()
+        score2 = db.query(ContestScore).filter(
+            ContestScore.contest_id == contest.id,
+            ContestScore.user_id == contest.user2_id
+        ).first()
+        
+        # Get rating changes
+        history1 = db.query(RatingHistory).filter(
+            RatingHistory.contest_id == contest.id,
+            RatingHistory.user_id == contest.user1_id
+        ).first()
+        history2 = db.query(RatingHistory).filter(
+            RatingHistory.contest_id == contest.id,
+            RatingHistory.user_id == contest.user2_id
+        ).first()
+        
+        result.append(PublicContestResponse(
+            id=contest.id,
+            user1_handle=user1.handle if user1 else "Unknown",
+            user2_handle=user2.handle if user2 else "Unknown",
+            difficulty=contest.difficulty,
+            start_time=contest.start_time,
+            end_time=contest.end_time,
+            status=contest.status.value,
+            user1_points=score1.total_points if score1 else 0,
+            user2_points=score2.total_points if score2 else 0,
+            user1_rating_change=history1.rating_change if history1 else None,
+            user2_rating_change=history2.rating_change if history2 else None
+        ))
+    
+    return result
+
+
+@public_router.get("/top", response_model=List[PublicContestResponse])
+async def get_top_contests(
+    limit: int = Query(10, ge=1, le=50, description="Number of contests to return"),
+    sort_by: str = Query("rating_change", description="Sort by: rating_change, points, competitiveness"),
+    db: Session = Depends(get_db)
+):
+    """Get top contests by various criteria (public endpoint)"""
+    contests_query = db.query(Contest).filter(
+        Contest.status == ContestStatus.COMPLETED
+    )
+    
+    if sort_by == "rating_change":
+        # Sort by highest combined absolute rating change
+        contests = contests_query.order_by(Contest.end_time.desc()).limit(limit * 2).all()
+        # Calculate rating change for each and sort
+        contest_data = []
+        for contest in contests:
+            history1 = db.query(RatingHistory).filter(
+                RatingHistory.contest_id == contest.id,
+                RatingHistory.user_id == contest.user1_id
+            ).first()
+            history2 = db.query(RatingHistory).filter(
+                RatingHistory.contest_id == contest.id,
+                RatingHistory.user_id == contest.user2_id
+            ).first()
+            
+            total_change = abs(history1.rating_change if history1 else 0) + abs(history2.rating_change if history2 else 0)
+            contest_data.append((total_change, contest))
+        
+        contest_data.sort(key=lambda x: x[0], reverse=True)
+        contests = [c[1] for c in contest_data[:limit]]
+    elif sort_by == "points":
+        # Sort by highest total points scored
+        contests = contests_query.order_by(Contest.end_time.desc()).limit(limit * 2).all()
+        contest_data = []
+        for contest in contests:
+            score1 = db.query(ContestScore).filter(
+                ContestScore.contest_id == contest.id,
+                ContestScore.user_id == contest.user1_id
+            ).first()
+            score2 = db.query(ContestScore).filter(
+                ContestScore.contest_id == contest.id,
+                ContestScore.user_id == contest.user2_id
+            ).first()
+            
+            total_points = (score1.total_points if score1 else 0) + (score2.total_points if score2 else 0)
+            contest_data.append((total_points, contest))
+        
+        contest_data.sort(key=lambda x: x[0], reverse=True)
+        contests = [c[1] for c in contest_data[:limit]]
+    else:  # competitiveness (closest scores)
+        contests = contests_query.order_by(Contest.end_time.desc()).limit(limit * 2).all()
+        contest_data = []
+        for contest in contests:
+            score1 = db.query(ContestScore).filter(
+                ContestScore.contest_id == contest.id,
+                ContestScore.user_id == contest.user1_id
+            ).first()
+            score2 = db.query(ContestScore).filter(
+                ContestScore.contest_id == contest.id,
+                ContestScore.user_id == contest.user2_id
+            ).first()
+            
+            point_diff = abs((score1.total_points if score1 else 0) - (score2.total_points if score2 else 0))
+            contest_data.append((point_diff, contest))
+        
+        contest_data.sort(key=lambda x: x[0])  # Sort by smallest difference
+        contests = [c[1] for c in contest_data[:limit]]
+    
+    result = []
+    for contest in contests:
+        user1 = db.query(User).filter(User.id == contest.user1_id).first()
+        user2 = db.query(User).filter(User.id == contest.user2_id).first()
+        
+        score1 = db.query(ContestScore).filter(
+            ContestScore.contest_id == contest.id,
+            ContestScore.user_id == contest.user1_id
+        ).first()
+        score2 = db.query(ContestScore).filter(
+            ContestScore.contest_id == contest.id,
+            ContestScore.user_id == contest.user2_id
+        ).first()
+        
+        history1 = db.query(RatingHistory).filter(
+            RatingHistory.contest_id == contest.id,
+            RatingHistory.user_id == contest.user1_id
+        ).first()
+        history2 = db.query(RatingHistory).filter(
+            RatingHistory.contest_id == contest.id,
+            RatingHistory.user_id == contest.user2_id
+        ).first()
+        
+        result.append(PublicContestResponse(
+            id=contest.id,
+            user1_handle=user1.handle if user1 else "Unknown",
+            user2_handle=user2.handle if user2 else "Unknown",
+            difficulty=contest.difficulty,
+            start_time=contest.start_time,
+            end_time=contest.end_time,
+            status=contest.status.value,
+            user1_points=score1.total_points if score1 else 0,
+            user2_points=score2.total_points if score2 else 0,
+            user1_rating_change=history1.rating_change if history1 else None,
+            user2_rating_change=history2.rating_change if history2 else None
+        ))
+    
+    return result
 
 
 async def create_contest_from_challenge(challenge: Challenge, db: Session):

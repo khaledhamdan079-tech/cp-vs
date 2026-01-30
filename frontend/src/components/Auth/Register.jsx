@@ -33,7 +33,14 @@ const Register = () => {
       await login(handle, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed');
+      console.error('Registration error:', err);
+      // Handle different error response formats
+      const errorMessage = 
+        err.response?.data?.detail || 
+        err.response?.data?.message ||
+        err.message ||
+        'Registration failed. Please check your connection and try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

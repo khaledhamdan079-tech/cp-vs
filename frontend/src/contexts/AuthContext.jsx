@@ -47,11 +47,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (handle, password) => {
-    const response = await apiClient.post('/api/auth/register', {
-      handle,
-      password,
-    });
-    return response.data;
+    try {
+      const response = await apiClient.post('/api/auth/register', {
+        handle: handle.trim(),
+        password,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Register API error:', error);
+      throw error;
+    }
   };
 
   const logout = () => {

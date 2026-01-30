@@ -6,6 +6,9 @@ import Register from './components/Auth/Register';
 import Dashboard from './components/Dashboard/Dashboard';
 import CreateChallenge from './components/Challenge/CreateChallenge';
 import ContestView from './components/Contest/ContestView';
+import Homepage from './components/Home/Homepage';
+import Leaderboard from './components/Leaderboard/Leaderboard';
+import UserProfile from './components/Profile/UserProfile';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -34,7 +37,9 @@ function App() {
       <Router>
         <Layout>
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" />} />
+            <Route path="/" element={<Homepage />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/users/:handle" element={<UserProfile />} />
             <Route
               path="/login"
               element={
