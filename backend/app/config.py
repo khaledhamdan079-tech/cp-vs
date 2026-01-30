@@ -54,24 +54,28 @@ elif 'codeforces_api_url' in os.environ:
     _env_vars['codeforces_api_url'] = os.environ['codeforces_api_url']
 
 # Create settings with environment variables
-# If _env_vars is empty, Settings() will read from .env file or raise error
-# Check if we're missing DATABASE_URL and provide helpful error
-if not database_url and not any('database' in k.lower() for k in os.environ.keys()):
-    # Check if we're likely on Railway (has PORT or RAILWAY env vars)
-    is_railway = 'PORT' in os.environ or 'RAILWAY_ENVIRONMENT' in os.environ
-    if is_railway:
-        raise ValueError(
-            "DATABASE_URL is required but not found. "
-            "On Railway, you need to add a PostgreSQL database service:\n"
-            "1. Go to your Railway project\n"
-            "2. Click 'New' → 'Database' → 'Add PostgreSQL'\n"
-            "3. Railway will automatically set DATABASE_URL\n"
-            "4. Redeploy your backend service"
-        )
-    else:
-        raise ValueError(
-            "DATABASE_URL environment variable is required. "
-            "Set it in your .env file or environment variables."
-        )
-
-settings = Settings(**_env_vars) if _env_vars else Settings()
+# Try to create Settings - it will read from .env file if _env_vars is empty
+try:
+    settings = Settings(**_env_vars) if _env_vars else Settings()
+except Exception as e:
+    # If Settings creation fails, check if it's a missing DATABASE_URL
+    error_msg = str(e).lower()
+    if 'database_url' in error_msg or 'database_url' in str(e):
+        # Check if we're likely on Railway (has PORT or RAILWAY env vars)
+        is_railway = 'PORT' in os.environ or 'RAILWAY_ENVIRONMENT' in os.environ
+        if is_railway:
+            raise ValueError(
+                "DATABASE_URL is required but not found. "
+                "On Railway, you need to add a PostgreSQL database service:\n"
+                "1. Go to your Railway project\n"
+                "2. Click 'New' → 'Database' → 'Add PostgreSQL'\n"
+                "3. Add DATABASE_URL variable: ${{Postgres.DATABASE_URL}}\n"
+                "4. Redeploy your backend service"
+            ) from e
+        else:
+            raise ValueError(
+                "DATABASE_URL environment variable is required. "
+                "Set it in your .env file or environment variables."
+            ) from e
+    # Re-raise other errors as-is
+    raise
