@@ -58,61 +58,77 @@ async def get_leaderboard(
 @router.get("/{handle}/profile", response_model=UserProfileResponse)
 async def get_user_profile(handle: str, db: Session = Depends(get_db)):
     """Get detailed user profile (public endpoint)"""
-    user = db.query(User).filter(User.handle == handle).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # Get contest statistics
-    user_contests = db.query(Contest).filter(
-        or_(
-            Contest.user1_id == user.id,
-            Contest.user2_id == user.id
-        ),
-        Contest.status == ContestStatus.COMPLETED
-    ).all()
-    
-    total_contests = len(user_contests)
-    wins = 0
-    losses = 0
-    draws = 0
-    
-    for contest in user_contests:
-        score1 = db.query(ContestScore).filter(
-            ContestScore.contest_id == contest.id,
-            ContestScore.user_id == contest.user1_id
-        ).first()
-        score2 = db.query(ContestScore).filter(
-            ContestScore.contest_id == contest.id,
-            ContestScore.user_id == contest.user2_id
-        ).first()
+    try:
+        user = db.query(User).filter(User.handle == handle).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
         
-        if score1 and score2:
-            user_points = score1.total_points if contest.user1_id == user.id else score2.total_points
-            opponent_points = score2.total_points if contest.user1_id == user.id else score1.total_points
+        # Ensure user has rating (default to 1000 if missing due to migration)
+        if not hasattr(user, 'rating') or user.rating is None:
+            user.rating = 1000
+            db.commit()
+        
+        # Get contest statistics
+        user_contests = db.query(Contest).filter(
+            or_(
+                Contest.user1_id == user.id,
+                Contest.user2_id == user.id
+            ),
+            Contest.status == ContestStatus.COMPLETED
+        ).all()
+        
+        total_contests = len(user_contests)
+        wins = 0
+        losses = 0
+        draws = 0
+        
+        for contest in user_contests:
+            score1 = db.query(ContestScore).filter(
+                ContestScore.contest_id == contest.id,
+                ContestScore.user_id == contest.user1_id
+            ).first()
+            score2 = db.query(ContestScore).filter(
+                ContestScore.contest_id == contest.id,
+                ContestScore.user_id == contest.user2_id
+            ).first()
             
-            if user_points > opponent_points:
-                wins += 1
-            elif opponent_points > user_points:
-                losses += 1
-            else:
-                draws += 1
-    
-    win_rate = (wins / total_contests * 100) if total_contests > 0 else 0.0
-    
-    return UserProfileResponse(
-        id=user.id,
-        handle=user.handle,
-        rating=user.rating,
-        created_at=user.created_at,
-        total_contests=total_contests,
-        wins=wins,
-        losses=losses,
-        draws=draws,
-        win_rate=round(win_rate, 2)
-    )
+            if score1 and score2:
+                user_points = score1.total_points if contest.user1_id == user.id else score2.total_points
+                opponent_points = score2.total_points if contest.user1_id == user.id else score1.total_points
+                
+                if user_points > opponent_points:
+                    wins += 1
+                elif opponent_points > user_points:
+                    losses += 1
+                else:
+                    draws += 1
+        
+        win_rate = (wins / total_contests * 100) if total_contests > 0 else 0.0
+        
+        return UserProfileResponse(
+            id=user.id,
+            handle=user.handle,
+            rating=getattr(user, 'rating', 1000),  # Fallback to 1000 if rating missing
+            created_at=user.created_at,
+            total_contests=total_contests,
+            wins=wins,
+            losses=losses,
+            draws=draws,
+            win_rate=round(win_rate, 2)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in get_user_profile: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching user profile: {str(e)}"
+        )
 
 
 @router.get("/{handle}", response_model=UserResponse)

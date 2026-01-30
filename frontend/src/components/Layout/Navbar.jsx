@@ -24,6 +24,9 @@ const Navbar = () => {
             <>
               <Link to="/dashboard">Dashboard</Link>
               <Link to="/challenges/create">Create Challenge</Link>
+              <Link to={`/users/${user.handle}`} className="navbar-profile-link">
+                My Profile
+              </Link>
               <span className="navbar-user">Hello, {user.handle}</span>
               <button onClick={handleLogout} className="btn-logout">
                 Logout

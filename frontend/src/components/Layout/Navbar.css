@@ -36,6 +36,15 @@
   color: #4a9eff;
 }
 
+.navbar-profile-link {
+  color: #4a9eff;
+  font-weight: 500;
+}
+
+.navbar-profile-link:hover {
+  color: #6bb0ff;
+}
+
 .navbar-user {
   color: #ccc;
   font-size: 0.9rem;
