@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..database import get_db
-from ..models import User, Challenge, ChallengeStatus
+from ..models import User, Challenge, ChallengeStatus, Contest, ContestStatus
 from ..schemas import ChallengeCreate, ChallengeResponse
 from ..dependencies import get_current_user
 
@@ -40,6 +41,46 @@ async def create_challenge(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot challenge yourself"
+        )
+    
+    # Check for overlapping contests for both users
+    # Contest duration is 2 hours
+    proposed_start_time = challenge_data.suggested_start_time
+    proposed_end_time = proposed_start_time + timedelta(hours=2)
+    
+    # Check for overlapping contests
+    # A contest overlaps if: proposed_start < existing_end AND proposed_end > existing_start
+    overlapping_contest = db.query(Contest).filter(
+        Contest.status.in_([ContestStatus.SCHEDULED, ContestStatus.ACTIVE]),
+        Contest.start_time < proposed_end_time,
+        Contest.end_time > proposed_start_time,
+        or_(
+            Contest.user1_id == current_user.id,
+            Contest.user2_id == current_user.id,
+            Contest.user1_id == challenged_user.id,
+            Contest.user2_id == challenged_user.id
+        )
+    ).first()
+    
+    if overlapping_contest:
+        # Get user handles for the overlapping contest
+        overlapping_user1 = db.query(User).filter(User.id == overlapping_contest.user1_id).first()
+        overlapping_user2 = db.query(User).filter(User.id == overlapping_contest.user2_id).first()
+        
+        # Determine which user has the conflict
+        conflicting_user = None
+        if overlapping_contest.user1_id == current_user.id or overlapping_contest.user2_id == current_user.id:
+            conflicting_user = current_user.handle
+        elif overlapping_contest.user1_id == challenged_user.id or overlapping_contest.user2_id == challenged_user.id:
+            conflicting_user = challenged_user.handle
+        
+        # Format the error message
+        contest_info = f"{overlapping_user1.handle if overlapping_user1 else 'User1'} vs {overlapping_user2.handle if overlapping_user2 else 'User2'}"
+        time_info = f"{overlapping_contest.start_time.strftime('%Y-%m-%d %H:%M')} - {overlapping_contest.end_time.strftime('%Y-%m-%d %H:%M')}"
+        
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{conflicting_user if conflicting_user else 'One of the users'} already has a contest scheduled/active during this time ({contest_info}, {time_info}). Please choose a different time."
         )
     
     # Create challenge
