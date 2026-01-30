@@ -43,16 +43,27 @@ CODEFORCES_API_URL=https://codeforces.com/api
 1. Railway will detect your project
 2. Click "Add Service" → "GitHub Repo"
 3. Select your repository again
-4. In the service settings:
-   - **Root Directory**: Set to `backend`
-   - **Build Command**: Leave empty (Railway auto-detects Python)
-   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+4. **After the service is created**, click on the service tile
+5. Go to **Settings** tab
+6. Scroll down to find **"Source"** section
+7. Set **Root Directory** to: `backend`
+8. In **"Deploy"** section, set **Start Command** to: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+9. Build Command can be left empty (Railway auto-detects Python)
 
-### 2.3 Add PostgreSQL Database
+### 2.3 ⚠️ IMPORTANT: Add PostgreSQL Database FIRST
 
-1. In your Railway project, click "New" → "Database" → "Add PostgreSQL"
-2. Railway will create a PostgreSQL database
-3. Copy the `DATABASE_URL` from the database service (it's automatically set as an environment variable)
+**You MUST add PostgreSQL before setting environment variables, otherwise the backend will fail to start!**
+
+1. In your Railway project dashboard, click **"New"** button (top right)
+2. Select **"Database"** → **"Add PostgreSQL"**
+3. Railway will create a PostgreSQL database service
+4. **DATABASE_URL is automatically set** - you don't need to copy it manually
+5. Railway automatically shares `DATABASE_URL` with all services in the project
+
+**Why this is required:**
+- The backend requires `DATABASE_URL` to connect to the database
+- Without it, you'll see: `ValidationError: database_url Field required`
+- Railway sets `DATABASE_URL` automatically when you add PostgreSQL
 
 ### 2.4 Set Environment Variables
 
@@ -98,10 +109,12 @@ Visit:
 
 1. In the same Railway project, click "New" → "GitHub Repo"
 2. Select your repository again
-3. In service settings:
-   - **Root Directory**: Set to `frontend`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm run preview` (or use a static file server)
+3. **After the service is created**, click on the frontend service tile
+4. Go to **Settings** tab
+5. Scroll down to find **"Source"** section
+6. Set **Root Directory** to: `frontend`
+7. In **"Build"** section, set **Build Command** to: `npm install && npm run build`
+8. In **"Deploy"** section, set **Start Command** to: `npx serve dist -s -l $PORT`
 
 ### 3.2 Configure Frontend Environment Variables
 

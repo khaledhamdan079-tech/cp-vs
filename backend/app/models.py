@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Enum as SQLEnum, TypeDecorator
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -14,7 +15,7 @@ class GUID(TypeDecorator):
 
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
-            return dialect.type_descriptor(uuid.UUID)
+            return dialect.type_descriptor(PostgresUUID(as_uuid=True))
         else:
             return dialect.type_descriptor(String(36))
 
@@ -22,8 +23,10 @@ class GUID(TypeDecorator):
         if value is None:
             return value
         elif dialect.name == 'postgresql':
-            return str(value)
+            # PostgreSQL UUID type handles conversion automatically
+            return value
         else:
+            # SQLite: convert to string
             if not isinstance(value, uuid.UUID):
                 return str(uuid.UUID(value))
             return str(value)
@@ -31,7 +34,13 @@ class GUID(TypeDecorator):
     def process_result_value(self, value, dialect):
         if value is None:
             return value
+        elif dialect.name == 'postgresql':
+            # PostgreSQL returns UUID directly
+            if isinstance(value, uuid.UUID):
+                return value
+            return uuid.UUID(value)
         else:
+            # SQLite: convert from string
             if not isinstance(value, uuid.UUID):
                 return uuid.UUID(value)
             return value
