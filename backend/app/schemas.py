@@ -1,0 +1,145 @@
+from pydantic import BaseModel, EmailStr, field_serializer
+from typing import Optional, List
+from datetime import datetime, timezone
+from uuid import UUID
+
+
+# User schemas
+class UserBase(BaseModel):
+    handle: str
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class UserResponse(UserBase):
+    id: UUID
+    created_at: datetime
+
+    @field_serializer('created_at')
+    def serialize_datetime(self, dt: datetime, _info):
+        """Serialize datetime to ISO format with timezone"""
+        if dt is None:
+            return None
+        # If datetime is naive (no timezone), assume UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+    class Config:
+        from_attributes = True
+
+
+# Auth schemas
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    user_id: Optional[str] = None
+
+
+# Challenge schemas
+class ChallengeBase(BaseModel):
+    difficulty: int
+    suggested_start_time: datetime
+
+
+class ChallengeCreate(ChallengeBase):
+    challenged_user_id: Optional[UUID] = None
+    challenged_handle: Optional[str] = None
+
+
+class ChallengeResponse(ChallengeBase):
+    id: UUID
+    challenger_id: UUID
+    challenged_id: UUID
+    status: str
+    created_at: datetime
+    challenger: UserResponse
+    challenged: UserResponse
+
+    @field_serializer('suggested_start_time', 'created_at')
+    def serialize_datetime(self, dt: datetime, _info):
+        """Serialize datetime to ISO format with timezone"""
+        if dt is None:
+            return None
+        # If datetime is naive (no timezone), assume UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+    class Config:
+        from_attributes = True
+
+
+# Contest schemas
+class ContestProblemResponse(BaseModel):
+    id: UUID
+    problem_index: str
+    problem_code: str
+    problem_url: Optional[str] = None
+    points: int
+    solved_by: Optional[UUID] = None
+    solved_at: Optional[datetime] = None
+
+    @field_serializer('solved_at')
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        """Serialize datetime to ISO format with timezone"""
+        if dt is None:
+            return None
+        # If datetime is naive (no timezone), assume UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+    class Config:
+        from_attributes = True
+        
+    @classmethod
+    def from_orm(cls, obj):
+        return cls.model_validate(obj)
+
+
+class ContestScoreResponse(BaseModel):
+    user_id: UUID
+    user_handle: str
+    total_points: int
+
+
+class ContestResponse(BaseModel):
+    id: UUID
+    user1_id: UUID
+    user2_id: UUID
+    user1_handle: str
+    user2_handle: str
+    difficulty: int
+    start_time: datetime
+    end_time: datetime
+    status: str
+    problems: List[ContestProblemResponse] = []
+    scores: List[ContestScoreResponse] = []
+
+    @field_serializer('start_time', 'end_time')
+    def serialize_datetime(self, dt: datetime, _info):
+        """Serialize datetime to ISO format with timezone"""
+        if dt is None:
+            return None
+        # If datetime is naive (no timezone), assume UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+    class Config:
+        from_attributes = True
+
+
+# User search schema
+class UserSearchResponse(BaseModel):
+    id: UUID
+    handle: str
+
+    class Config:
+        from_attributes = True

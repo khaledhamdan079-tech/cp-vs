@@ -1,0 +1,65 @@
+.problem-card {
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.problem-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.problem-card.solved {
+  border-color: #28a745;
+  background-color: #f0fff4;
+}
+
+.problem-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.problem-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.solved-badge {
+  background-color: #28a745;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.problem-link {
+  display: inline-block;
+  background-color: #4a9eff;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: background-color 0.2s;
+  margin-top: 1rem;
+}
+
+.problem-link:hover {
+  background-color: #357abd;
+}
+
+.problem-code {
+  color: #666;
+  font-family: monospace;
+  margin-top: 1rem;
+}
+
+.solved-time {
+  margin-top: 0.5rem;
+  color: #28a745;
+  font-size: 0.9rem;
+}

@@ -1,0 +1,66 @@
+.leaderboard {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.leaderboard h2 {
+  margin-top: 0;
+  color: #333;
+  margin-bottom: 1.5rem;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.leaderboard-item.winner {
+  background: #fff3cd;
+  border-color: #ffc107;
+}
+
+.rank {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #666;
+  min-width: 50px;
+}
+
+.leaderboard-item.winner .rank {
+  color: #ffc107;
+}
+
+.user-info {
+  flex: 1;
+  margin-left: 1rem;
+}
+
+.handle {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.points {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #4a9eff;
+}
+
+.leaderboard-item.winner .points {
+  color: #ffc107;
+}
