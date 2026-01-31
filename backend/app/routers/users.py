@@ -5,7 +5,7 @@ from sqlalchemy import or_, func
 from ..database import get_db
 from ..models import User, Contest, ContestScore, ContestStatus, RatingHistory
 from ..schemas import UserResponse, UserSearchResponse, LeaderboardEntryResponse, UserProfileResponse
-from ..dependencies import get_current_user
+from ..dependencies import get_confirmed_user
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
