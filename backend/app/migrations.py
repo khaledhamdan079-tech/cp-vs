@@ -4,7 +4,10 @@ Database migration utilities for adding new columns and tables.
 from sqlalchemy import text, inspect
 from sqlalchemy.engine import Engine
 from .database import engine
-from .models import Base, RatingHistory
+from .models import (
+    Base, RatingHistory, Tournament, TournamentSlot, TournamentInvite,
+    TournamentMatch, TournamentRoundSchedule
+)
 import os
 
 
@@ -165,6 +168,65 @@ def run_migrations():
                 print("✓ Created 'rating_history' table")
             else:
                 print("✓ 'rating_history' table already exists")
+            
+            # Add tournament_match_id to contests table if it doesn't exist
+            if 'contests' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('contests')]
+                if 'tournament_match_id' not in columns:
+                    print("Adding 'tournament_match_id' column to contests table...")
+                    if engine.dialect.name == 'postgresql':
+                        conn.execute(text("""
+                            DO $$ 
+                            BEGIN
+                                IF NOT EXISTS (
+                                    SELECT 1 FROM information_schema.columns 
+                                    WHERE table_name = 'contests' AND column_name = 'tournament_match_id'
+                                ) THEN
+                                    ALTER TABLE contests ADD COLUMN tournament_match_id VARCHAR(36);
+                                    -- Make challenge_id nullable if it's not already
+                                    IF EXISTS (
+                                        SELECT 1 FROM information_schema.columns 
+                                        WHERE table_name = 'contests' AND column_name = 'challenge_id' AND is_nullable = 'NO'
+                                    ) THEN
+                                        ALTER TABLE contests ALTER COLUMN challenge_id DROP NOT NULL;
+                                    END IF;
+                                    -- Drop unique constraint on challenge_id if it exists
+                                    IF EXISTS (
+                                        SELECT 1 FROM information_schema.table_constraints 
+                                        WHERE table_name = 'contests' AND constraint_name = 'contests_challenge_id_key'
+                                    ) THEN
+                                        ALTER TABLE contests DROP CONSTRAINT contests_challenge_id_key;
+                                    END IF;
+                                    CREATE INDEX IF NOT EXISTS ix_contests_tournament_match_id ON contests(tournament_match_id);
+                                END IF;
+                            END $$;
+                        """))
+                    else:
+                        # SQLite - just add the column (SQLite allows adding nullable columns)
+                        conn.execute(text("ALTER TABLE contests ADD COLUMN tournament_match_id VARCHAR(36)"))
+                        # Try to make challenge_id nullable (SQLite doesn't support ALTER COLUMN, but we can work around it)
+                        # For now, just add the column - the model will handle nullable challenge_id
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_contests_tournament_match_id ON contests(tournament_match_id)"))
+                    print("✓ Added 'tournament_match_id' column to contests table")
+                else:
+                    print("✓ 'tournament_match_id' column already exists in contests table")
+            
+            # Create tournament tables if they don't exist
+            tournament_tables = [
+                ('tournaments', Tournament),
+                ('tournament_slots', TournamentSlot),
+                ('tournament_invites', TournamentInvite),
+                ('tournament_round_schedules', TournamentRoundSchedule),
+                ('tournament_matches', TournamentMatch),
+            ]
+            
+            for table_name, model_class in tournament_tables:
+                if table_name not in inspector.get_table_names():
+                    print(f"Creating '{table_name}' table...")
+                    Base.metadata.create_all(bind=engine, tables=[model_class.__table__])
+                    print(f"✓ Created '{table_name}' table")
+                else:
+                    print(f"✓ '{table_name}' table already exists")
         
         # Ensure all other tables exist (outside transaction for create_all)
         print("Ensuring all tables exist...")

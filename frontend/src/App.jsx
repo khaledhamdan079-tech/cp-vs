@@ -6,6 +6,8 @@ import Register from './components/Auth/Register';
 import Dashboard from './components/Dashboard/Dashboard';
 import CreateChallenge from './components/Challenge/CreateChallenge';
 import ContestView from './components/Contest/ContestView';
+import CreateTournament from './components/Tournament/CreateTournament';
+import TournamentView from './components/Tournament/TournamentView';
 import Homepage from './components/Home/Homepage';
 import Leaderboard from './components/Leaderboard/Leaderboard';
 import UserProfile from './components/Profile/UserProfile';
@@ -77,6 +79,22 @@ function App() {
               element={
                 <PrivateRoute>
                   <ContestView />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/tournaments/create"
+              element={
+                <PrivateRoute>
+                  <CreateTournament />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/tournaments/:tournamentId"
+              element={
+                <PrivateRoute>
+                  <TournamentView />
                 </PrivateRoute>
               }
             />

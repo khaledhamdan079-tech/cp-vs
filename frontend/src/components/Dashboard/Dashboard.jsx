@@ -10,6 +10,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [challenges, setChallenges] = useState([]);
   const [contests, setContests] = useState([]);
+  const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('challenges');
 
@@ -19,12 +20,14 @@ const Dashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [challengesRes, contestsRes] = await Promise.all([
+      const [challengesRes, contestsRes, tournamentsRes] = await Promise.all([
         apiClient.get('/api/challenges/'),
         apiClient.get('/api/contests/'),
+        apiClient.get('/api/tournaments/'),
       ]);
       setChallenges(challengesRes.data);
       setContests(contestsRes.data);
+      setTournaments(tournamentsRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -44,9 +47,14 @@ const Dashboard = () => {
     <div className="dashboard">
       <div className="dashboard-header">
         <h1>Dashboard</h1>
-        <Link to="/challenges/create" className="btn-create">
-          Create Challenge
-        </Link>
+        <div className="header-actions">
+          <Link to="/challenges/create" className="btn-create">
+            Create Challenge
+          </Link>
+          <Link to="/tournaments/create" className="btn-create">
+            Create Tournament
+          </Link>
+        </div>
       </div>
 
       <div className="tabs">
@@ -61,6 +69,12 @@ const Dashboard = () => {
           onClick={() => setActiveTab('contests')}
         >
           Contests ({contests.length})
+        </button>
+        <button
+          className={activeTab === 'tournaments' ? 'active' : ''}
+          onClick={() => setActiveTab('tournaments')}
+        >
+          Tournaments ({tournaments.length})
         </button>
       </div>
 
@@ -118,6 +132,32 @@ const Dashboard = () => {
                   </p>
                   <Link to={`/contests/${contest.id}`} className="btn-view">
                     View Contest
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'tournaments' && (
+        <div className="tournaments-section">
+          {tournaments.length === 0 ? (
+            <p className="empty-state">No tournaments yet. Create one to get started!</p>
+          ) : (
+            <div className="tournaments-list">
+              {tournaments.map((tournament) => (
+                <div key={tournament.id} className="tournament-card">
+                  <h3>
+                    Tournament ({tournament.num_participants} participants)
+                  </h3>
+                  <p>Difficulty: {tournament.difficulty}</p>
+                  <p>Status: {tournament.status}</p>
+                  <p>
+                    Filled: {tournament.slots.filter(s => s.user_id).length} / {tournament.num_participants}
+                  </p>
+                  <Link to={`/tournaments/${tournament.id}`} className="btn-view">
+                    View Tournament
                   </Link>
                 </div>
               ))}

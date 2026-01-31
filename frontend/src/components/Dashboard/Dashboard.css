@@ -10,6 +10,11 @@
   margin-bottom: 2rem;
 }
 
+.header-actions {
+  display: flex;
+  gap: 1rem;
+}
+
 .dashboard-header h1 {
   color: #333;
 }
@@ -78,7 +83,8 @@
   border-radius: 8px;
 }
 
-.contest-card {
+.contest-card,
+.tournament-card {
   background: white;
   border: 1px solid #ddd;
   border-radius: 8px;
@@ -86,14 +92,21 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.contest-card h3 {
+.contest-card h3,
+.tournament-card h3 {
   margin-top: 0;
   color: #333;
 }
 
-.contest-card p {
+.contest-card p,
+.tournament-card p {
   color: #666;
   margin: 0.5rem 0;
+}
+
+.tournaments-list {
+  display: grid;
+  gap: 1rem;
 }
 
 .btn-view {

@@ -1,0 +1,93 @@
+.tournament-bracket {
+  padding: 2rem;
+}
+
+.bracket-container {
+  display: flex;
+  gap: 2rem;
+  overflow-x: auto;
+  padding: 1rem 0;
+}
+
+.bracket-round {
+  min-width: 300px;
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.bracket-round h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.matches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.match-card {
+  background: white;
+  padding: 1rem;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.match-players {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.player {
+  flex: 1;
+  padding: 0.5rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.player.winner {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.vs {
+  color: #666;
+  font-weight: 600;
+}
+
+.match-info {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.match-info p {
+  margin: 0.25rem 0;
+}
+
+.winner-info {
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.view-contest-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.view-contest-link:hover {
+  text-decoration: underline;
+}
+
+.no-matches {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-size: 1.1rem;
+}

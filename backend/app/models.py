@@ -59,6 +59,26 @@ class ContestStatus(str, enum.Enum):
     COMPLETED = "completed"
 
 
+class TournamentStatus(str, enum.Enum):
+    PENDING = "pending"
+    REGISTERING = "registering"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class TournamentInviteStatus(str, enum.Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
+class TournamentMatchStatus(str, enum.Enum):
+    SCHEDULED = "scheduled"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -76,6 +96,9 @@ class User(Base):
     contests_user1 = relationship("Contest", foreign_keys="Contest.user1_id", back_populates="user1")
     contests_user2 = relationship("Contest", foreign_keys="Contest.user2_id", back_populates="user2")
     rating_history = relationship("RatingHistory", back_populates="user")
+    tournament_slots = relationship("TournamentSlot", back_populates="user")
+    tournament_invites_sent = relationship("TournamentInvite", foreign_keys="TournamentInvite.invited_user_id", back_populates="invited_user")
+    tournaments_created = relationship("Tournament", foreign_keys="Tournament.creator_id", back_populates="creator")
 
 
 class Challenge(Base):
@@ -99,7 +122,8 @@ class Contest(Base):
     __tablename__ = "contests"
 
     id = Column(GUID(), primary_key=True, default=uuid.uuid4)
-    challenge_id = Column(GUID(), ForeignKey("challenges.id"), nullable=False, unique=True)
+    challenge_id = Column(GUID(), ForeignKey("challenges.id"), nullable=True, unique=True)
+    tournament_match_id = Column(GUID(), ForeignKey("tournament_matches.id"), nullable=True)
     user1_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
     user2_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
     difficulty = Column(Integer, nullable=False)  # 1-4
@@ -110,6 +134,7 @@ class Contest(Base):
 
     # Relationships
     challenge = relationship("Challenge", back_populates="contest")
+    tournament_match = relationship("TournamentMatch", back_populates="contest", foreign_keys=[tournament_match_id], uselist=False)
     user1 = relationship("User", foreign_keys=[user1_id], back_populates="contests_user1")
     user2 = relationship("User", foreign_keys=[user2_id], back_populates="contests_user2")
     problems = relationship("ContestProblem", back_populates="contest", cascade="all, delete-orphan")
@@ -163,3 +188,95 @@ class RatingHistory(Base):
     # Relationships
     user = relationship("User", back_populates="rating_history")
     contest = relationship("Contest", back_populates="rating_history")
+
+
+class Tournament(Base):
+    __tablename__ = "tournaments"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    creator_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    num_participants = Column(Integer, nullable=False)  # 4, 8, 16, 32, or 64
+    difficulty = Column(Integer, nullable=False)  # 1-4
+    status = Column(SQLEnum(TournamentStatus), default=TournamentStatus.PENDING)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    start_time = Column(DateTime, nullable=True)  # When all slots filled
+
+    # Relationships
+    creator = relationship("User", foreign_keys=[creator_id], back_populates="tournaments_created")
+    slots = relationship("TournamentSlot", back_populates="tournament", cascade="all, delete-orphan")
+    invites = relationship("TournamentInvite", back_populates="tournament", cascade="all, delete-orphan")
+    matches = relationship("TournamentMatch", back_populates="tournament", cascade="all, delete-orphan")
+    round_schedules = relationship("TournamentRoundSchedule", back_populates="tournament", cascade="all, delete-orphan")
+
+
+class TournamentSlot(Base):
+    __tablename__ = "tournament_slots"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    tournament_id = Column(GUID(), ForeignKey("tournaments.id"), nullable=False)
+    slot_number = Column(Integer, nullable=False)  # 1 to num_participants
+    user_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
+    status = Column(String, default="PENDING")  # PENDING or ACCEPTED
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    tournament = relationship("Tournament", back_populates="slots")
+    user = relationship("User", back_populates="tournament_slots")
+
+
+class TournamentInvite(Base):
+    __tablename__ = "tournament_invites"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    tournament_id = Column(GUID(), ForeignKey("tournaments.id"), nullable=False)
+    slot_id = Column(GUID(), ForeignKey("tournament_slots.id"), nullable=False)
+    invited_user_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    status = Column(SQLEnum(TournamentInviteStatus), default=TournamentInviteStatus.PENDING)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    responded_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    tournament = relationship("Tournament", back_populates="invites")
+    slot = relationship("TournamentSlot")
+    invited_user = relationship("User", foreign_keys=[invited_user_id], back_populates="tournament_invites_sent")
+
+
+class TournamentRoundSchedule(Base):
+    __tablename__ = "tournament_round_schedules"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    tournament_id = Column(GUID(), ForeignKey("tournaments.id"), nullable=False)
+    round_number = Column(Integer, nullable=False)  # 1, 2, 3...
+    start_time = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    tournament = relationship("Tournament", back_populates="round_schedules")
+
+
+class TournamentMatch(Base):
+    __tablename__ = "tournament_matches"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    tournament_id = Column(GUID(), ForeignKey("tournaments.id"), nullable=False)
+    round_number = Column(Integer, nullable=False)  # 1, 2, 3...
+    slot1_id = Column(GUID(), ForeignKey("tournament_slots.id"), nullable=False)
+    slot2_id = Column(GUID(), ForeignKey("tournament_slots.id"), nullable=False)
+    user1_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    user2_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    contest_id = Column(GUID(), ForeignKey("contests.id"), nullable=True)
+    winner_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
+    status = Column(SQLEnum(TournamentMatchStatus), default=TournamentMatchStatus.SCHEDULED)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    start_time = Column(DateTime, nullable=True)
+    end_time = Column(DateTime, nullable=True)
+
+    # Relationships
+    tournament = relationship("Tournament", back_populates="matches")
+    slot1 = relationship("TournamentSlot", foreign_keys=[slot1_id])
+    slot2 = relationship("TournamentSlot", foreign_keys=[slot2_id])
+    user1 = relationship("User", foreign_keys=[user1_id])
+    user2 = relationship("User", foreign_keys=[user2_id])
+    contest = relationship("Contest", foreign_keys=[contest_id], uselist=False)
+    winner = relationship("User", foreign_keys=[winner_id])

@@ -256,3 +256,148 @@ class PublicContestResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Tournament schemas
+class TournamentCreate(BaseModel):
+    num_participants: int
+    difficulty: int
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "num_participants": 8,
+                "difficulty": 2
+            }
+        }
+
+
+class TournamentRoundScheduleCreate(BaseModel):
+    round_number: int
+    start_time: datetime
+    
+    @field_serializer('start_time')
+    def serialize_datetime(self, dt: datetime, _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+
+class TournamentRoundScheduleUpdate(BaseModel):
+    round_schedules: List[TournamentRoundScheduleCreate]
+
+
+class TournamentRoundScheduleResponse(BaseModel):
+    id: UUID
+    round_number: int
+    start_time: datetime
+    
+    @field_serializer('start_time')
+    def serialize_datetime(self, dt: datetime, _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    
+    class Config:
+        from_attributes = True
+
+
+class TournamentSlotResponse(BaseModel):
+    id: UUID
+    slot_number: int
+    user_id: Optional[UUID] = None
+    user_handle: Optional[str] = None
+    status: str
+    
+    class Config:
+        from_attributes = True
+
+
+class TournamentInviteCreate(BaseModel):
+    invited_user_id: UUID
+    slot_id: UUID
+
+
+class TournamentInviteResponse(BaseModel):
+    id: UUID
+    tournament_id: UUID
+    slot_id: UUID
+    slot_number: int
+    invited_user_id: UUID
+    invited_user_handle: str
+    status: str
+    created_at: datetime
+    responded_at: Optional[datetime] = None
+    
+    @field_serializer('created_at', 'responded_at')
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    
+    class Config:
+        from_attributes = True
+
+
+class TournamentMatchResponse(BaseModel):
+    id: UUID
+    round_number: int
+    slot1_id: UUID
+    slot2_id: UUID
+    user1_id: UUID
+    user2_id: UUID
+    user1_handle: str
+    user2_handle: str
+    contest_id: Optional[UUID] = None
+    winner_id: Optional[UUID] = None
+    winner_handle: Optional[str] = None
+    status: str
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    
+    @field_serializer('start_time', 'end_time')
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    
+    class Config:
+        from_attributes = True
+
+
+class TournamentBracketResponse(BaseModel):
+    rounds: List[dict]  # List of rounds, each containing matches
+
+
+class TournamentResponse(BaseModel):
+    id: UUID
+    creator_id: UUID
+    creator_handle: str
+    num_participants: int
+    difficulty: int
+    status: str
+    created_at: datetime
+    start_time: Optional[datetime] = None
+    slots: List[TournamentSlotResponse] = []
+    invites: List[TournamentInviteResponse] = []
+    matches: List[TournamentMatchResponse] = []
+    round_schedules: List[TournamentRoundScheduleResponse] = []
+    
+    @field_serializer('created_at', 'start_time')
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    
+    class Config:
+        from_attributes = True

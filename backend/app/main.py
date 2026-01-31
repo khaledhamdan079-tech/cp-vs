@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from .database import engine, Base
-from .routers import auth, users, challenges, contests
+from .routers import auth, users, challenges, contests, tournaments
 from .submission_checker import start_scheduler
 from .migrations import run_migrations
 
@@ -60,6 +60,7 @@ app.include_router(users.router)
 app.include_router(challenges.router)
 app.include_router(contests.router)
 app.include_router(contests.public_router)
+app.include_router(tournaments.router)
 
 
 @app.get("/")
