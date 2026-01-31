@@ -17,26 +17,44 @@ const ContestView = () => {
 
   useEffect(() => {
     fetchContest();
-    // Poll every 10 seconds if contest is active
+    // Poll every 10 seconds if contest is active, or if contest is scheduled and less than 2 minutes before start
     const interval = setInterval(() => {
-      if (contest?.status === 'active') {
-        fetchContest();
+      if (contest) {
+        const now = new Date();
+        const startTime = utcToLocal(contest.start_time);
+        const timeUntilStart = startTime - now;
+        const twoMinutes = 2 * 60 * 1000; // 2 minutes in milliseconds
+        
+        // Poll if contest is active, or if scheduled and less than 2 minutes before start
+        if (contest.status === 'active' || 
+            (contest.status === 'scheduled' && timeUntilStart <= twoMinutes && timeUntilStart > 0)) {
+          fetchContest();
+        }
       }
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [contestId, contest?.status]);
+  }, [contestId, contest?.status, contest?.start_time]);
 
-  // Update current time every second for time remaining display
+  // Update current time every second for time remaining display or when contest is about to start
   useEffect(() => {
-    if (contest?.status === 'active') {
-      const timeInterval = setInterval(() => {
-        setCurrentTime(new Date());
-      }, 1000);
+    if (contest) {
+      const now = new Date();
+      const startTime = utcToLocal(contest.start_time);
+      const timeUntilStart = startTime - now;
+      const twoMinutes = 2 * 60 * 1000; // 2 minutes in milliseconds
+      
+      // Update time if contest is active, or if scheduled and less than 2 minutes before start
+      if (contest.status === 'active' || 
+          (contest.status === 'scheduled' && timeUntilStart <= twoMinutes && timeUntilStart > 0)) {
+        const timeInterval = setInterval(() => {
+          setCurrentTime(new Date());
+        }, 1000);
 
-      return () => clearInterval(timeInterval);
+        return () => clearInterval(timeInterval);
+      }
     }
-  }, [contest?.status]);
+  }, [contest?.status, contest?.start_time]);
 
   const fetchContest = async () => {
     try {

@@ -227,43 +227,15 @@ async def create_contest_from_challenge(challenge: Challenge, db: Session):
     db.commit()
     db.refresh(contest)
     
-    # Get user handles for problem selection
+    # Create initial scores (problems will be selected later by scheduled task)
     user1 = db.query(User).filter(User.id == challenge.challenger_id).first()
     user2 = db.query(User).filter(User.id == challenge.challenged_id).first()
     
-    # Select problems
-    try:
-        problems = await get_unsolved_problems(
-            user1.handle,
-            user2.handle,
-            challenge.difficulty
-        )
-        
-        # Create contest problems
-        for prob_data in problems:
-            contest_problem = ContestProblem(
-                contest_id=contest.id,
-                problem_index=prob_data["problem_index"],
-                problem_code=prob_data["problem_code"],
-                problem_url=prob_data["problem_url"],
-                points=prob_data["points"],
-                division=prob_data["division"]
-            )
-            db.add(contest_problem)
-        
-        # Create initial scores
-        score1 = ContestScore(contest_id=contest.id, user_id=user1.id, total_points=0)
-        score2 = ContestScore(contest_id=contest.id, user_id=user2.id, total_points=0)
-        db.add(score1)
-        db.add(score2)
-        
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error selecting problems: {str(e)}"
-        )
+    score1 = ContestScore(contest_id=contest.id, user_id=user1.id, total_points=0)
+    score2 = ContestScore(contest_id=contest.id, user_id=user2.id, total_points=0)
+    db.add(score1)
+    db.add(score2)
+    db.commit()
     
     return contest
 

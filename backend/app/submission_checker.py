@@ -1,6 +1,6 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 import asyncio
 from uuid import UUID
@@ -8,6 +8,7 @@ from .database import SessionLocal
 from .models import Contest, ContestProblem, ContestScore, ContestStatus, User, RatingHistory
 from .codeforces_api import cf_api
 from .rating import calculate_elo_rating, determine_contest_scores
+from .problem_selector import get_unsolved_problems
 
 
 scheduler = AsyncIOScheduler()
@@ -156,7 +157,16 @@ async def check_contest_submissions(contest_id):
         if not contest or contest.status != ContestStatus.ACTIVE:
             return
         
-        # Get contest problems
+        # Check if problems exist - if not, return early (problems may not be selected yet)
+        all_problems = db.query(ContestProblem).filter(
+            ContestProblem.contest_id == contest.id
+        ).all()
+        
+        if not all_problems:
+            # Problems haven't been selected yet, skip checking submissions
+            return
+        
+        # Get contest problems that haven't been solved yet
         problems = db.query(ContestProblem).filter(
             ContestProblem.contest_id == contest.id,
             ContestProblem.solved_by.is_(None)  # Only check unsolved problems
@@ -247,6 +257,85 @@ async def check_all_active_contests():
         db.close()
 
 
+async def select_contest_problems():
+    """Select problems for contests that are less than 1 minute away from start time"""
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        # Find contests that are scheduled, less than 1 minute from start, and don't have problems yet
+        contests_needing_problems = db.query(Contest).filter(
+            Contest.status == ContestStatus.SCHEDULED,
+            Contest.start_time - now <= timedelta(minutes=1),
+            Contest.start_time > now  # Still haven't started
+        ).all()
+        
+        for contest in contests_needing_problems:
+            # Check if problems already exist
+            existing_problems = db.query(ContestProblem).filter(
+                ContestProblem.contest_id == contest.id
+            ).first()
+            
+            if existing_problems:
+                # Problems already selected, skip
+                continue
+            
+            # Get user handles for problem selection
+            user1 = db.query(User).filter(User.id == contest.user1_id).first()
+            user2 = db.query(User).filter(User.id == contest.user2_id).first()
+            
+            if not user1 or not user2:
+                print(f"Error: Users not found for contest {contest.id}")
+                continue
+            
+            try:
+                # Select problems
+                problems = await get_unsolved_problems(
+                    user1.handle,
+                    user2.handle,
+                    contest.difficulty
+                )
+                
+                # Create contest problems
+                for prob_data in problems:
+                    contest_problem = ContestProblem(
+                        contest_id=contest.id,
+                        problem_index=prob_data["problem_index"],
+                        problem_code=prob_data["problem_code"],
+                        problem_url=prob_data["problem_url"],
+                        points=prob_data["points"],
+                        division=prob_data["division"]
+                    )
+                    db.add(contest_problem)
+                
+                # Ensure scores exist (they should already exist, but check to be safe)
+                score1 = db.query(ContestScore).filter(
+                    ContestScore.contest_id == contest.id,
+                    ContestScore.user_id == user1.id
+                ).first()
+                score2 = db.query(ContestScore).filter(
+                    ContestScore.contest_id == contest.id,
+                    ContestScore.user_id == user2.id
+                ).first()
+                
+                if not score1:
+                    score1 = ContestScore(contest_id=contest.id, user_id=user1.id, total_points=0)
+                    db.add(score1)
+                
+                if not score2:
+                    score2 = ContestScore(contest_id=contest.id, user_id=user2.id, total_points=0)
+                    db.add(score2)
+                
+                db.commit()
+                print(f"Successfully selected {len(problems)} problems for contest {contest.id}")
+            except Exception as e:
+                db.rollback()
+                print(f"Error selecting problems for contest {contest.id}: {e}")
+    except Exception as e:
+        print(f"Error in select_contest_problems: {e}")
+    finally:
+        db.close()
+
+
 def start_scheduler():
     """Start the background scheduler"""
     # Check all active contests every 10 seconds
@@ -263,6 +352,14 @@ def start_scheduler():
         'interval',
         seconds=60,
         id='activate_contests'
+    )
+    
+    # Check for contests that need problems selected (less than 1 minute before start)
+    scheduler.add_job(
+        select_contest_problems,
+        'interval',
+        seconds=10,
+        id='select_contest_problems'
     )
     
     # Check pending user confirmations every 30 seconds
