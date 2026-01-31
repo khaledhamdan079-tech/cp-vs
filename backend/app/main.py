@@ -40,22 +40,15 @@ async def lifespan(app: FastAPI):
         try:
             print("[INFO] Running database migrations...", file=sys.stderr)
             run_migrations()
+            print("[INFO] Database migrations completed", file=sys.stderr)
         except Exception as e:
             error_msg = f"[WARNING] Migration error (non-fatal): {e}"
             print(error_msg, file=sys.stderr)
             import traceback
             traceback.print_exc(file=sys.stderr)
         
-        # Create tables (creates new tables if they don't exist)
-        try:
-            print("[INFO] Ensuring all tables exist...", file=sys.stderr)
-            Base.metadata.create_all(bind=engine)
-            print("[INFO] Database initialization complete", file=sys.stderr)
-        except Exception as e:
-            error_msg = f"[WARNING] Table creation error: {e}"
-            print(error_msg, file=sys.stderr)
-            import traceback
-            traceback.print_exc(file=sys.stderr)
+        # Note: Table creation is now handled inside run_migrations() to avoid duplication
+        print("[INFO] Database initialization complete", file=sys.stderr)
     
     # Start scheduler
     try:

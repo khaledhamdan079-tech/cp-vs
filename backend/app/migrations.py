@@ -69,8 +69,10 @@ def run_migrations():
         raise
     
     try:
-        with engine.begin() as conn:  # Use begin() for transaction management
-            inspector = inspect(engine)
+        inspector = inspect(engine)
+        
+        # Use a transaction only for ALTER TABLE operations (adding columns)
+        with engine.begin() as conn:
             
             # Check if we should clear all data (set CLEAR_DB=true environment variable)
             # WARNING: This will delete ALL data! Use with caution.
@@ -170,13 +172,7 @@ def run_migrations():
             else:
                 print("[WARNING] 'users' table does not exist yet - will be created by create_all()")
             
-            # Create rating_history table if it doesn't exist
-            if 'rating_history' not in inspector.get_table_names():
-                print("Creating 'rating_history' table...")
-                Base.metadata.create_all(bind=engine, tables=[RatingHistory.__table__])
-                print("[OK] Created 'rating_history' table")
-            else:
-                print("[OK] 'rating_history' table already exists")
+            # Note: rating_history table creation moved outside transaction
             
             # Add tournament_match_id to contests table if it doesn't exist
             if 'contests' in inspector.get_table_names():
@@ -220,27 +216,53 @@ def run_migrations():
                 else:
                     print("[OK] 'tournament_match_id' column already exists in contests table")
             
-            # Create tournament tables if they don't exist
-            tournament_tables = [
-                ('tournaments', Tournament),
-                ('tournament_slots', TournamentSlot),
-                ('tournament_invites', TournamentInvite),
-                ('tournament_round_schedules', TournamentRoundSchedule),
-                ('tournament_matches', TournamentMatch),
-            ]
-            
-            for table_name, model_class in tournament_tables:
-                if table_name not in inspector.get_table_names():
-                    print(f"Creating '{table_name}' table...")
+        # Create rating_history table if it doesn't exist (outside transaction)
+        if 'rating_history' not in inspector.get_table_names():
+            print("Creating 'rating_history' table...")
+            try:
+                Base.metadata.create_all(bind=engine, tables=[RatingHistory.__table__])
+                print("[OK] Created 'rating_history' table")
+            except Exception as table_error:
+                print(f"[WARNING] Failed to create 'rating_history' table: {table_error}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("[OK] 'rating_history' table already exists")
+        
+        # Create tournament tables if they don't exist (outside transaction)
+        tournament_tables = [
+            ('tournaments', Tournament),
+            ('tournament_slots', TournamentSlot),
+            ('tournament_invites', TournamentInvite),
+            ('tournament_round_schedules', TournamentRoundSchedule),
+            ('tournament_matches', TournamentMatch),
+        ]
+        
+        for table_name, model_class in tournament_tables:
+            if table_name not in inspector.get_table_names():
+                print(f"Creating '{table_name}' table...")
+                try:
+                    # Create table outside transaction to avoid locks
                     Base.metadata.create_all(bind=engine, tables=[model_class.__table__])
                     print(f"[OK] Created '{table_name}' table")
-                else:
-                    print(f"[OK] '{table_name}' table already exists")
+                except Exception as table_error:
+                    print(f"[WARNING] Failed to create '{table_name}' table: {table_error}")
+                    import traceback
+                    traceback.print_exc()
+                    # Continue with other tables
+            else:
+                print(f"[OK] '{table_name}' table already exists")
         
         # Ensure all other tables exist (outside transaction for create_all)
         print("Ensuring all tables exist...")
-        Base.metadata.create_all(bind=engine)
-        print("[OK] All tables verified")
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("[OK] All tables verified")
+        except Exception as create_error:
+            print(f"[WARNING] Error during table creation: {create_error}")
+            import traceback
+            traceback.print_exc()
+            # Don't fail - tables might already exist
         
     except Exception as e:
         print(f"[WARNING] Migration error: {e}")
