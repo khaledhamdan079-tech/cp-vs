@@ -6,7 +6,7 @@ from ..models import User
 from ..schemas import UserCreate, UserResponse, Token, RegistrationResponse, ConfirmationStatusResponse
 from ..auth import verify_password, get_password_hash, create_access_token
 from ..config import settings
-from ..dependencies import get_current_user
+from ..dependencies import get_current_user, get_confirmed_user
 from ..codeforces_api import cf_api
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
