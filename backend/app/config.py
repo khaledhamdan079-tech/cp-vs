@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
 import os
+import sys
 
 
 class Settings(BaseSettings):
@@ -63,19 +64,27 @@ except Exception as e:
     if 'database_url' in error_msg or 'database_url' in str(e):
         # Check if we're likely on Railway (has PORT or RAILWAY env vars)
         is_railway = 'PORT' in os.environ or 'RAILWAY_ENVIRONMENT' in os.environ
-        if is_railway:
-            raise ValueError(
-                "DATABASE_URL is required but not found. "
-                "On Railway, you need to add a PostgreSQL database service:\n"
-                "1. Go to your Railway project\n"
-                "2. Click 'New' → 'Database' → 'Add PostgreSQL'\n"
-                "3. Add DATABASE_URL variable: ${{Postgres.DATABASE_URL}}\n"
-                "4. Redeploy your backend service"
-            ) from e
-        else:
-            raise ValueError(
-                "DATABASE_URL environment variable is required. "
-                "Set it in your .env file or environment variables."
-            ) from e
-    # Re-raise other errors as-is
-    raise
+        error_message = (
+            "DATABASE_URL is required but not found. "
+            "On Railway, you need to add a PostgreSQL database service:\n"
+            "1. Go to your Railway project\n"
+            "2. Click 'New' → 'Database' → 'Add PostgreSQL'\n"
+            "3. Add DATABASE_URL variable: ${{Postgres.DATABASE_URL}}\n"
+            "4. Redeploy your backend service"
+        ) if is_railway else (
+            "DATABASE_URL environment variable is required. "
+            "Set it in your .env file or environment variables."
+        )
+        print(f"[ERROR] {error_message}", file=sys.stderr)
+        # Create a dummy settings object to prevent import crash
+        # The app will handle database errors gracefully
+        class DummySettings:
+            database_url = "sqlite:///dummy.db"
+            jwt_secret_key = os.getenv("JWT_SECRET_KEY", "dummy-secret-key-change-in-production")
+            jwt_algorithm = os.getenv("JWT_ALGORITHM", "HS256")
+            access_token_expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+            codeforces_api_url = os.getenv("CODEFORCES_API_URL", "https://codeforces.com/api")
+        settings = DummySettings()
+    else:
+        # Re-raise other errors as-is
+        raise

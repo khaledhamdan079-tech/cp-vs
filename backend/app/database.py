@@ -25,18 +25,22 @@ try:
             }
         )
 except Exception as e:
-    print(f"⚠️  Database engine creation error: {e}")
+    print(f"[ERROR] Database engine creation error: {e}")
     import traceback
     traceback.print_exc()
-    # Re-raise to fail fast if database is completely unavailable
-    raise
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
+    # Don't re-raise - let the app start and handle errors gracefully
+    # The app will check database_available flag
+    engine = None
+    SessionLocal = None
+    Base = None
+else:
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    Base = declarative_base()
 
 
 def get_db():
+    if SessionLocal is None:
+        raise RuntimeError("Database not initialized. Check DATABASE_URL environment variable.")
     db = SessionLocal()
     try:
         yield db

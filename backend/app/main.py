@@ -4,44 +4,63 @@ from contextlib import asynccontextmanager
 import sys
 import os
 from sqlalchemy import text
-from .database import engine, Base
-from .routers import auth, users, challenges, contests, tournaments
-from .submission_checker import start_scheduler, scheduler
-from .migrations import run_migrations
 
-# Run migrations first (adds new columns to existing tables)
-# Wrap in try-except to prevent app crash if migrations fail
+# Import database components - these might fail, so handle gracefully
 try:
-    run_migrations()
+    from .database import engine, Base
+    database_available = True
 except Exception as e:
-    error_msg = f"[WARNING] Migration error (non-fatal): {e}"
-    print(error_msg, file=sys.stderr)
-    print("Attempting to continue - tables will be created by create_all()", file=sys.stderr)
+    print(f"[ERROR] Failed to initialize database: {e}", file=sys.stderr)
     import traceback
     traceback.print_exc(file=sys.stderr)
-    # In production, log but don't crash
-    if os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("PORT"):
-        print("Running in production - continuing despite migration error", file=sys.stderr)
+    database_available = False
+    engine = None
+    Base = None
 
-# Create tables (creates new tables if they don't exist)
+# Import routers and other components
 try:
-    Base.metadata.create_all(bind=engine)
+    from .routers import auth, users, challenges, contests, tournaments
+    from .submission_checker import start_scheduler, scheduler
+    from .migrations import run_migrations
 except Exception as e:
-    error_msg = f"[WARNING] Table creation error: {e}"
-    print(error_msg, file=sys.stderr)
+    print(f"[ERROR] Failed to import modules: {e}", file=sys.stderr)
     import traceback
     traceback.print_exc(file=sys.stderr)
-    # Don't crash - let the app start and handle errors at runtime
-    if os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("PORT"):
-        print("Running in production - continuing despite table creation error", file=sys.stderr)
+    # Set defaults to prevent crashes
+    scheduler = None
+    start_scheduler = lambda: None
+    run_migrations = lambda: None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
-    # Startup
+    # Startup - run migrations and initialize database
+    if database_available and engine and Base:
+        try:
+            print("[INFO] Running database migrations...", file=sys.stderr)
+            run_migrations()
+        except Exception as e:
+            error_msg = f"[WARNING] Migration error (non-fatal): {e}"
+            print(error_msg, file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+        
+        # Create tables (creates new tables if they don't exist)
+        try:
+            print("[INFO] Ensuring all tables exist...", file=sys.stderr)
+            Base.metadata.create_all(bind=engine)
+            print("[INFO] Database initialization complete", file=sys.stderr)
+        except Exception as e:
+            error_msg = f"[WARNING] Table creation error: {e}"
+            print(error_msg, file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+    
+    # Start scheduler
     try:
-        start_scheduler()
+        if scheduler:
+            start_scheduler()
     except Exception as e:
         error_msg = f"[WARNING] Scheduler startup error (non-fatal): {e}"
         print(error_msg, file=sys.stderr)
@@ -85,13 +104,16 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Include routers
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(challenges.router)
-app.include_router(contests.router)
-app.include_router(contests.public_router)
-app.include_router(tournaments.router)
+# Include routers (only if they imported successfully)
+try:
+    app.include_router(auth.router)
+    app.include_router(users.router)
+    app.include_router(challenges.router)
+    app.include_router(contests.router)
+    app.include_router(contests.public_router)
+    app.include_router(tournaments.router)
+except NameError:
+    print("[ERROR] Failed to include routers - some modules may not have loaded", file=sys.stderr)
 
 
 @app.get("/")
@@ -102,6 +124,13 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint for Railway and load balancers"""
+    if not database_available or not engine:
+        return {
+            "status": "unhealthy",
+            "database": "not_available",
+            "message": "Database not initialized"
+        }
+    
     try:
         # Test database connection
         with engine.connect() as conn:
@@ -109,7 +138,7 @@ async def health():
         return {
             "status": "healthy",
             "database": "connected",
-            "scheduler": "running" if scheduler.running else "stopped"
+            "scheduler": "running" if scheduler and scheduler.running else "stopped"
         }
     except Exception as e:
         return {
