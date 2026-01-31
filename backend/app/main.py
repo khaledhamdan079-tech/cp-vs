@@ -1,23 +1,54 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import sys
+import os
+from sqlalchemy import text
 from .database import engine, Base
 from .routers import auth, users, challenges, contests, tournaments
-from .submission_checker import start_scheduler
+from .submission_checker import start_scheduler, scheduler
 from .migrations import run_migrations
 
 # Run migrations first (adds new columns to existing tables)
-run_migrations()
+# Wrap in try-except to prevent app crash if migrations fail
+try:
+    run_migrations()
+except Exception as e:
+    error_msg = f"[WARNING] Migration error (non-fatal): {e}"
+    print(error_msg, file=sys.stderr)
+    print("Attempting to continue - tables will be created by create_all()", file=sys.stderr)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
+    # In production, log but don't crash
+    if os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("PORT"):
+        print("Running in production - continuing despite migration error", file=sys.stderr)
 
 # Create tables (creates new tables if they don't exist)
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    error_msg = f"[WARNING] Table creation error: {e}"
+    print(error_msg, file=sys.stderr)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
+    # Don't crash - let the app start and handle errors at runtime
+    if os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("PORT"):
+        print("Running in production - continuing despite table creation error", file=sys.stderr)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     # Startup
-    start_scheduler()
+    try:
+        start_scheduler()
+    except Exception as e:
+        error_msg = f"[WARNING] Scheduler startup error (non-fatal): {e}"
+        print(error_msg, file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        # Continue even if scheduler fails to start
+    
     yield
     # Shutdown (if needed)
 
@@ -70,4 +101,19 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    """Health check endpoint for Railway and load balancers"""
+    try:
+        # Test database connection
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "scheduler": "running" if scheduler.running else "stopped"
+        }
+    except Exception as e:
+        return {
+            "status": "degraded",
+            "database": "disconnected",
+            "error": str(e)
+        }

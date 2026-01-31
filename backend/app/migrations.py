@@ -27,38 +27,47 @@ def clear_all_data(conn):
     if 'rating_history' in tables:
         count = conn.execute(text("SELECT COUNT(*) FROM rating_history")).scalar()
         conn.execute(text("DELETE FROM rating_history"))
-        print(f"  ✓ Deleted {count} records from rating_history")
+        print(f"  [OK] Deleted {count} records from rating_history")
     
     if 'contest_scores' in tables:
         count = conn.execute(text("SELECT COUNT(*) FROM contest_scores")).scalar()
         conn.execute(text("DELETE FROM contest_scores"))
-        print(f"  ✓ Deleted {count} records from contest_scores")
+        print(f"  [OK] Deleted {count} records from contest_scores")
     
     if 'contest_problems' in tables:
         count = conn.execute(text("SELECT COUNT(*) FROM contest_problems")).scalar()
         conn.execute(text("DELETE FROM contest_problems"))
-        print(f"  ✓ Deleted {count} records from contest_problems")
+        print(f"  [OK] Deleted {count} records from contest_problems")
     
     if 'contests' in tables:
         count = conn.execute(text("SELECT COUNT(*) FROM contests")).scalar()
         conn.execute(text("DELETE FROM contests"))
-        print(f"  ✓ Deleted {count} records from contests")
+        print(f"  [OK] Deleted {count} records from contests")
     
     if 'challenges' in tables:
         count = conn.execute(text("SELECT COUNT(*) FROM challenges")).scalar()
         conn.execute(text("DELETE FROM challenges"))
-        print(f"  ✓ Deleted {count} records from challenges")
+        print(f"  [OK] Deleted {count} records from challenges")
     
     if 'users' in tables:
         count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
         conn.execute(text("DELETE FROM users"))
-        print(f"  ✓ Deleted {count} records from users")
+        print(f"  [OK] Deleted {count} records from users")
     
-    print("✓ Database cleared successfully\n")
+    print("[OK] Database cleared successfully\n")
 
 
 def run_migrations():
     """Run database migrations to add new columns and tables"""
+    try:
+        # Test database connection first
+        with engine.connect() as test_conn:
+            test_conn.execute(text("SELECT 1"))
+    except Exception as e:
+        print(f"[WARNING] Database connection test failed: {e}")
+        print("Skipping migrations - will retry on first request")
+        raise
+    
     try:
         with engine.begin() as conn:  # Use begin() for transaction management
             inspector = inspect(engine)
@@ -91,9 +100,9 @@ def run_migrations():
                     else:
                         # SQLite
                         conn.execute(text("ALTER TABLE users ADD COLUMN rating INTEGER NOT NULL DEFAULT 1000"))
-                    print("✓ Added 'rating' column with default value 1000")
+                    print("[OK] Added 'rating' column with default value 1000")
                 else:
-                    print("✓ 'rating' column already exists")
+                    print("[OK] 'rating' column already exists")
                 
                 # Add is_confirmed column if it doesn't exist
                 if 'is_confirmed' not in columns:
@@ -115,9 +124,9 @@ def run_migrations():
                         # SQLite
                         conn.execute(text("ALTER TABLE users ADD COLUMN is_confirmed BOOLEAN NOT NULL DEFAULT 0"))
                         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_is_confirmed ON users(is_confirmed)"))
-                    print("✓ Added 'is_confirmed' column with default value FALSE")
+                    print("[OK] Added 'is_confirmed' column with default value FALSE")
                 else:
-                    print("✓ 'is_confirmed' column already exists")
+                    print("[OK] 'is_confirmed' column already exists")
                 
                 # Add confirmation_deadline column if it doesn't exist
                 if 'confirmation_deadline' not in columns:
@@ -137,9 +146,9 @@ def run_migrations():
                     else:
                         # SQLite
                         conn.execute(text("ALTER TABLE users ADD COLUMN confirmation_deadline DATETIME"))
-                    print("✓ Added 'confirmation_deadline' column")
+                    print("[OK] Added 'confirmation_deadline' column")
                 else:
-                    print("✓ 'confirmation_deadline' column already exists")
+                    print("[OK] 'confirmation_deadline' column already exists")
                 
                 # Set existing users as confirmed (they registered before this feature)
                 if 'is_confirmed' in columns:
@@ -157,17 +166,17 @@ def run_migrations():
                             SET is_confirmed = 1 
                             WHERE is_confirmed = 0 AND confirmation_deadline IS NULL
                         """))
-                    print("✓ Existing users marked as confirmed")
+                    print("[OK] Existing users marked as confirmed")
             else:
-                print("⚠ 'users' table does not exist yet - will be created by create_all()")
+                print("[WARNING] 'users' table does not exist yet - will be created by create_all()")
             
             # Create rating_history table if it doesn't exist
             if 'rating_history' not in inspector.get_table_names():
                 print("Creating 'rating_history' table...")
                 Base.metadata.create_all(bind=engine, tables=[RatingHistory.__table__])
-                print("✓ Created 'rating_history' table")
+                print("[OK] Created 'rating_history' table")
             else:
-                print("✓ 'rating_history' table already exists")
+                print("[OK] 'rating_history' table already exists")
             
             # Add tournament_match_id to contests table if it doesn't exist
             if 'contests' in inspector.get_table_names():
@@ -207,9 +216,9 @@ def run_migrations():
                         # Try to make challenge_id nullable (SQLite doesn't support ALTER COLUMN, but we can work around it)
                         # For now, just add the column - the model will handle nullable challenge_id
                         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_contests_tournament_match_id ON contests(tournament_match_id)"))
-                    print("✓ Added 'tournament_match_id' column to contests table")
+                    print("[OK] Added 'tournament_match_id' column to contests table")
                 else:
-                    print("✓ 'tournament_match_id' column already exists in contests table")
+                    print("[OK] 'tournament_match_id' column already exists in contests table")
             
             # Create tournament tables if they don't exist
             tournament_tables = [
@@ -224,17 +233,17 @@ def run_migrations():
                 if table_name not in inspector.get_table_names():
                     print(f"Creating '{table_name}' table...")
                     Base.metadata.create_all(bind=engine, tables=[model_class.__table__])
-                    print(f"✓ Created '{table_name}' table")
+                    print(f"[OK] Created '{table_name}' table")
                 else:
-                    print(f"✓ '{table_name}' table already exists")
+                    print(f"[OK] '{table_name}' table already exists")
         
         # Ensure all other tables exist (outside transaction for create_all)
         print("Ensuring all tables exist...")
         Base.metadata.create_all(bind=engine)
-        print("✓ All tables verified")
+        print("[OK] All tables verified")
         
     except Exception as e:
-        print(f"⚠ Migration error: {e}")
+        print(f"[WARNING] Migration error: {e}")
         print("Attempting to continue - tables will be created by create_all()")
         # Fallback: just create all tables
         Base.metadata.create_all(bind=engine)

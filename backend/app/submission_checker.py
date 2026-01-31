@@ -509,40 +509,66 @@ async def select_contest_problems():
 
 def start_scheduler():
     """Start the background scheduler"""
-    # Check all active contests every 10 seconds
-    scheduler.add_job(
-        check_all_active_contests,
-        'interval',
-        seconds=10,
-        id='check_active_contests'
-    )
-    
-    # Also check for contests that need to be activated
-    scheduler.add_job(
-        activate_scheduled_contests,
-        'interval',
-        seconds=60,
-        id='activate_contests'
-    )
-    
-    # Check for contests that need problems selected (less than 1 minute before start)
-    scheduler.add_job(
-        select_contest_problems,
-        'interval',
-        seconds=10,
-        id='select_contest_problems'
-    )
-    
-    # Check pending user confirmations every 30 seconds
-    from .confirmation_checker import check_pending_confirmations
-    scheduler.add_job(
-        check_pending_confirmations,
-        'interval',
-        seconds=30,
-        id='check_pending_confirmations'
-    )
-    
-    scheduler.start()
+    try:
+        # Check if scheduler is already running
+        if scheduler.running:
+            return
+        
+        # Check all active contests every 10 seconds
+        try:
+            scheduler.add_job(
+                check_all_active_contests,
+                'interval',
+                seconds=10,
+                id='check_active_contests',
+                replace_existing=True
+            )
+        except Exception as e:
+            print(f"Warning: Failed to add check_active_contests job: {e}")
+        
+        # Also check for contests that need to be activated
+        try:
+            scheduler.add_job(
+                activate_scheduled_contests,
+                'interval',
+                seconds=60,
+                id='activate_contests',
+                replace_existing=True
+            )
+        except Exception as e:
+            print(f"Warning: Failed to add activate_contests job: {e}")
+        
+        # Check for contests that need problems selected (less than 1 minute before start)
+        try:
+            scheduler.add_job(
+                select_contest_problems,
+                'interval',
+                seconds=10,
+                id='select_contest_problems',
+                replace_existing=True
+            )
+        except Exception as e:
+            print(f"Warning: Failed to add select_contest_problems job: {e}")
+        
+        # Check pending user confirmations every 30 seconds
+        try:
+            from .confirmation_checker import check_pending_confirmations
+            scheduler.add_job(
+                check_pending_confirmations,
+                'interval',
+                seconds=30,
+                id='check_pending_confirmations',
+                replace_existing=True
+            )
+        except Exception as e:
+            print(f"Warning: Failed to add check_pending_confirmations job: {e}")
+        
+        scheduler.start()
+    except Exception as e:
+        print(f"Warning: Failed to start scheduler: {e}")
+        import traceback
+        traceback.print_exc()
+        # Don't crash the app if scheduler fails
 
 
 async def activate_scheduled_contests():
