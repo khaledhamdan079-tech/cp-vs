@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import ConfirmationScreen from './ConfirmationScreen';
 import './Auth.css';
 
 const Register = () => {
@@ -9,8 +10,8 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register, login } = useAuth();
-  const navigate = useNavigate();
+  const [registrationData, setRegistrationData] = useState(null);
+  const { register } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,9 +30,13 @@ const Register = () => {
     setLoading(true);
 
     try {
-      await register(handle, password);
-      await login(handle, password);
-      navigate('/dashboard');
+      const response = await register(handle, password);
+      // Store token if provided
+      if (response.access_token) {
+        localStorage.setItem('token', response.access_token);
+      }
+      // Store registration data and show confirmation screen
+      setRegistrationData(response);
     } catch (err) {
       console.error('Registration error:', err);
       // Handle different error response formats
@@ -45,6 +50,11 @@ const Register = () => {
       setLoading(false);
     }
   };
+
+  // Show confirmation screen if registration was successful
+  if (registrationData) {
+    return <ConfirmationScreen registrationData={registrationData} />;
+  }
 
   return (
     <div className="auth-container">

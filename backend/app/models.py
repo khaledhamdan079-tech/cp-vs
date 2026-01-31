@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Enum as SQLEnum, TypeDecorator
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Enum as SQLEnum, TypeDecorator, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -67,6 +67,8 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     rating = Column(Integer, default=1000, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    is_confirmed = Column(Boolean, default=False, nullable=False, index=True)
+    confirmation_deadline = Column(DateTime, nullable=True)
 
     # Relationships
     challenges_sent = relationship("Challenge", foreign_keys="Challenge.challenger_id", back_populates="challenger")

@@ -8,7 +8,7 @@ from ..models import (
     ChallengeStatus, ContestStatus
 )
 from ..schemas import ContestResponse, ContestProblemResponse, ContestScoreResponse, PublicContestResponse
-from ..dependencies import get_current_user
+from ..dependencies import get_confirmed_user
 from ..problem_selector import get_unsolved_problems
 from sqlalchemy import or_, func, desc
 
@@ -270,7 +270,7 @@ async def create_contest_from_challenge(challenge: Challenge, db: Session):
 
 @router.get("/", response_model=List[ContestResponse])
 async def list_contests(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_confirmed_user),
     db: Session = Depends(get_db)
 ):
     """Get all contests for the current user"""
@@ -345,7 +345,7 @@ async def list_contests(
 @router.get("/{contest_id}", response_model=ContestResponse)
 async def get_contest(
     contest_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_confirmed_user),
     db: Session = Depends(get_db)
 ):
     contest = db.query(Contest).filter(Contest.id == contest_id).first()
@@ -423,7 +423,7 @@ async def get_contest(
 @router.get("/{contest_id}/problems", response_model=List[ContestProblemResponse])
 async def get_contest_problems(
     contest_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_confirmed_user),
     db: Session = Depends(get_db)
 ):
     contest = db.query(Contest).filter(Contest.id == contest_id).first()

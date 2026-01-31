@@ -1,0 +1,83 @@
+.confirmation-card {
+  max-width: 500px;
+}
+
+.confirmation-instructions {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.confirmation-instructions p {
+  margin-bottom: 1rem;
+  color: #555;
+  line-height: 1.6;
+}
+
+.time-limit {
+  font-size: 1.1rem;
+  color: #4a9eff;
+  font-weight: 500;
+}
+
+.btn-problem-link {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  background-color: #4a9eff;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  margin-bottom: 2rem;
+}
+
+.btn-problem-link:hover {
+  background-color: #357abd;
+}
+
+.checking-status {
+  text-align: center;
+  margin: 2rem 0;
+  color: #666;
+}
+
+.spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #4a9eff;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin: 1rem auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.success-message {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.success-message h2 {
+  color: #28a745;
+  margin-bottom: 1rem;
+}
+
+.success-message p {
+  color: #666;
+}
+
+.confirmation-help {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #eee;
+  text-align: center;
+  color: #888;
+  font-size: 0.9rem;
+}

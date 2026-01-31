@@ -129,6 +129,26 @@ class CodeforcesAPI:
             print(f"Error checking submission for {handle}: {e}")
             return None
 
+    async def check_any_submission(self, handle: str, problem_code: str, since: int) -> Optional[Dict]:
+        """Check if user has submitted ANY solution (regardless of verdict) to a specific problem since a given timestamp"""
+        try:
+            submissions = await self.get_user_submissions(handle)
+            for submission in submissions:
+                if submission.get("creationTimeSeconds", 0) < since:
+                    break
+                # Check for any submission, not just OK verdicts
+                problem = submission.get("problem", {})
+                contest_id = problem.get("contestId")
+                index = problem.get("index")
+                if contest_id and index:
+                    code = f"{contest_id}{index}"
+                    if code == problem_code:
+                        return submission
+            return None
+        except Exception as e:
+            print(f"Error checking any submission for {handle}: {e}")
+            return None
+
     async def close(self):
         await self.client.aclose()
 

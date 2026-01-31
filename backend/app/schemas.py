@@ -32,6 +32,7 @@ class UserResponse(UserBase):
     id: UUID
     rating: int
     created_at: datetime
+    is_confirmed: bool
 
     @field_serializer('created_at')
     def serialize_datetime(self, dt: datetime, _info):
@@ -45,6 +46,40 @@ class UserResponse(UserBase):
 
     class Config:
         from_attributes = True
+
+
+class RegistrationResponse(UserResponse):
+    """Response for registration including confirmation details"""
+    problem_link: str
+    deadline: Optional[datetime] = None
+    access_token: Optional[str] = None
+    token_type: Optional[str] = None
+
+    @field_serializer('deadline')
+    def serialize_deadline(self, dt: Optional[datetime], _info):
+        """Serialize deadline to ISO format with timezone"""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+
+class ConfirmationStatusResponse(BaseModel):
+    """Response for confirmation status check"""
+    is_confirmed: bool
+    deadline: Optional[datetime] = None
+    time_remaining: Optional[int] = None  # seconds remaining
+    problem_link: str
+
+    @field_serializer('deadline')
+    def serialize_deadline(self, dt: Optional[datetime], _info):
+        """Serialize deadline to ISO format with timezone"""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
 
 
 # Auth schemas

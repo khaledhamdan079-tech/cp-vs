@@ -29,10 +29,27 @@ export const AuthProvider = ({ children }) => {
       const response = await apiClient.get('/api/auth/me');
       setUser(response.data);
     } catch (error) {
-      localStorage.removeItem('token');
-      setUser(null);
+      // Handle 403 (unconfirmed user) differently
+      if (error.response?.status === 403) {
+        // User is not confirmed, but keep token for confirmation status check
+        // Don't clear token, but set user to null
+        setUser(null);
+      } else {
+        localStorage.removeItem('token');
+        setUser(null);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkConfirmationStatus = async () => {
+    try {
+      const response = await apiClient.get('/api/auth/confirmation-status');
+      return response.data;
+    } catch (error) {
+      console.error('Error checking confirmation status:', error);
+      throw error;
     }
   };
 
@@ -52,6 +69,7 @@ export const AuthProvider = ({ children }) => {
         handle: handle.trim(),
         password,
       });
+      // Token is already stored in Register component, but we return the data
       return response.data;
     } catch (error) {
       console.error('Register API error:', error);
@@ -65,7 +83,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, fetchUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, fetchUser, checkConfirmationStatus }}>
       {children}
     </AuthContext.Provider>
   );

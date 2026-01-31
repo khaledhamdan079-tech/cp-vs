@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from ..database import get_db
 from ..models import User, Challenge, ChallengeStatus, Contest, ContestStatus
 from ..schemas import ChallengeCreate, ChallengeResponse
-from ..dependencies import get_current_user
+from ..dependencies import get_confirmed_user
 
 router = APIRouter(prefix="/api/challenges", tags=["challenges"])
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/challenges", tags=["challenges"])
 @router.post("/", response_model=ChallengeResponse)
 async def create_challenge(
     challenge_data: ChallengeCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_confirmed_user),
     db: Session = Depends(get_db)
 ):
     # Validate difficulty
@@ -115,7 +115,7 @@ async def create_challenge(
 
 @router.get("/", response_model=List[ChallengeResponse])
 async def list_challenges(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_confirmed_user),
     db: Session = Depends(get_db)
 ):
     """Get all challenges sent or received by the current user"""
@@ -129,7 +129,7 @@ async def list_challenges(
 
 @router.get("/pending-count")
 async def get_pending_challenges_count(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_confirmed_user),
     db: Session = Depends(get_db)
 ):
     """Get count of pending challenges received by the current user"""
@@ -144,7 +144,7 @@ async def get_pending_challenges_count(
 @router.post("/{challenge_id}/accept", response_model=ChallengeResponse)
 async def accept_challenge(
     challenge_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_confirmed_user),
     db: Session = Depends(get_db)
 ):
     challenge = db.query(Challenge).filter(Challenge.id == challenge_id).first()
@@ -180,7 +180,7 @@ async def accept_challenge(
 @router.post("/{challenge_id}/reject", response_model=ChallengeResponse)
 async def reject_challenge(
     challenge_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_confirmed_user),
     db: Session = Depends(get_db)
 ):
     challenge = db.query(Challenge).filter(Challenge.id == challenge_id).first()

@@ -44,3 +44,18 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+async def get_confirmed_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    Dependency that ensures the user is confirmed.
+    Use this in all protected endpoints that require confirmed users.
+    """
+    if not current_user.is_confirmed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account not confirmed. Please complete the confirmation process by submitting a solution to the Watermelon problem (4A) on Codeforces.",
+        )
+    return current_user

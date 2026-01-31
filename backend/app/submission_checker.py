@@ -265,6 +265,15 @@ def start_scheduler():
         id='activate_contests'
     )
     
+    # Check pending user confirmations every 30 seconds
+    from .confirmation_checker import check_pending_confirmations
+    scheduler.add_job(
+        check_pending_confirmations,
+        'interval',
+        seconds=30,
+        id='check_pending_confirmations'
+    )
+    
     scheduler.start()
 
 

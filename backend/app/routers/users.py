@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_profile(current_user: User = Depends(get_current_user)):
+async def get_current_user_profile(current_user: User = Depends(get_confirmed_user)):
     return current_user
 
 
@@ -19,7 +19,7 @@ async def get_current_user_profile(current_user: User = Depends(get_current_user
 async def search_users(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(10, ge=1, le=50, description="Maximum number of results"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_confirmed_user),
     db: Session = Depends(get_db)
 ):
     """Search users by handle (for challenge creation)"""
