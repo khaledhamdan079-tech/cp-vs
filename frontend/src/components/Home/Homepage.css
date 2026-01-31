@@ -201,6 +201,73 @@
   padding: 2rem;
 }
 
+.upcoming-contests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.upcoming-contest-card {
+  padding: 1.25rem;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+  transition: box-shadow 0.3s, transform 0.2s;
+}
+
+.upcoming-contest-card:hover {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  transform: translateY(-2px);
+}
+
+.contest-participants {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.contest-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.contest-time,
+.contest-difficulty {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.contest-time .label,
+.contest-difficulty .label {
+  font-weight: 600;
+  color: #666;
+}
+
+.contest-time .value,
+.contest-difficulty .value {
+  color: #333;
+}
+
+.btn-view-contest {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: #667eea;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  transition: background 0.3s;
+  text-align: center;
+}
+
+.btn-view-contest:hover {
+  background: #5568d3;
+}
+
 .homepage {
   max-width: 1200px;
   margin: 0 auto;

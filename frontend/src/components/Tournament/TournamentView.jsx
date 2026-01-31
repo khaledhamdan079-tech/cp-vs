@@ -130,6 +130,20 @@ const TournamentView = () => {
     }
   };
 
+  const handleCancelTournament = async () => {
+    if (!window.confirm('Are you sure you want to cancel this tournament? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      await apiClient.post(`/api/tournaments/${tournamentId}/cancel`);
+      // Navigate back to dashboard after cancellation
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to cancel tournament');
+    }
+  };
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
@@ -143,6 +157,7 @@ const TournamentView = () => {
   const allSlotsFilled = tournament.slots.every(slot => slot.user_id);
   const allRoundsScheduled = tournament.round_schedules.length === numRounds;
   const canStart = allSlotsFilled && allRoundsScheduled && tournament.status === 'pending';
+  const canCancel = isCreator && tournament.status !== 'active' && tournament.status !== 'completed' && tournament.status !== 'cancelled';
 
   // Get pending invites for current user
   const pendingInvites = tournament.invites.filter(
@@ -152,15 +167,25 @@ const TournamentView = () => {
   return (
     <div className="tournament-view">
       <div className="tournament-header">
-        <h1>Tournament #{tournament.id.slice(0, 8)}</h1>
-        <div className="tournament-info">
-          <p><strong>Participants:</strong> {tournament.num_participants}</p>
-          <p><strong>Difficulty:</strong> {tournament.difficulty}</p>
-          <p><strong>Status:</strong> {tournament.status}</p>
-          {tournament.start_time && (
-            <p><strong>Started:</strong> {formatLocalDateTime(tournament.start_time)}</p>
-          )}
+        <div className="tournament-header-content">
+          <h1>Tournament #{tournament.id.slice(0, 8)}</h1>
+          <div className="tournament-info">
+            <p><strong>Participants:</strong> {tournament.num_participants}</p>
+            <p><strong>Difficulty:</strong> {tournament.difficulty}</p>
+            <p><strong>Status:</strong> {tournament.status}</p>
+            {tournament.start_time && (
+              <p><strong>Started:</strong> {formatLocalDateTime(tournament.start_time)}</p>
+            )}
+          </div>
         </div>
+        {canCancel && (
+          <button 
+            onClick={handleCancelTournament} 
+            className="btn-cancel-tournament"
+          >
+            Cancel Tournament
+          </button>
+        )}
       </div>
 
       {error && <div className="error-message">{error}</div>}

@@ -149,8 +149,10 @@ async def list_tournaments(
         Tournament.id.in_(participant_tournament_ids)
     ).all()
     
-    # Combine and deduplicate
+    # Combine and deduplicate, excluding cancelled tournaments
     all_tournaments = {t.id: t for t in created_tournaments + participant_tournaments}.values()
+    # Filter out cancelled tournaments
+    all_tournaments = [t for t in all_tournaments if t.status != TournamentStatus.CANCELLED]
     
     result = []
     for tournament in all_tournaments:
@@ -887,6 +889,135 @@ async def start_tournament(
     
     # Return updated tournament
     return await get_tournament(tournament_id, current_user, db)
+
+
+@router.post("/{tournament_id}/cancel", response_model=TournamentResponse)
+async def cancel_tournament(
+    tournament_id: str,
+    current_user: User = Depends(get_confirmed_user),
+    db: Session = Depends(get_db)
+):
+    """Cancel tournament (creator only, only if not started)"""
+    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tournament not found"
+        )
+    
+    if tournament.creator_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the tournament creator can cancel the tournament"
+        )
+    
+    if tournament.status == TournamentStatus.CANCELLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tournament is already cancelled"
+        )
+    
+    if tournament.status == TournamentStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot cancel an active tournament"
+        )
+    
+    if tournament.status == TournamentStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot cancel a completed tournament"
+        )
+    
+    # Cancel the tournament
+    tournament.status = TournamentStatus.CANCELLED
+    db.commit()
+    db.refresh(tournament)
+    
+    # Load relationships for response
+    creator = db.query(User).filter(User.id == tournament.creator_id).first()
+    slots = db.query(TournamentSlot).filter(TournamentSlot.tournament_id == tournament.id).all()
+    invites = db.query(TournamentInvite).filter(TournamentInvite.tournament_id == tournament.id).all()
+    matches = db.query(TournamentMatch).filter(TournamentMatch.tournament_id == tournament.id).all()
+    round_schedules = db.query(TournamentRoundSchedule).filter(
+        TournamentRoundSchedule.tournament_id == tournament.id
+    ).order_by(TournamentRoundSchedule.round_number).all()
+    
+    # Build responses (same as get_tournament)
+    slot_responses = []
+    for slot in slots:
+        user_handle = None
+        if slot.user_id:
+            user = db.query(User).filter(User.id == slot.user_id).first()
+            user_handle = user.handle if user else None
+        slot_responses.append(TournamentSlotResponse(
+            id=slot.id,
+            slot_number=slot.slot_number,
+            user_id=slot.user_id,
+            user_handle=user_handle,
+            status=slot.status
+        ))
+    
+    invite_responses = []
+    for invite in invites:
+        invited_user = db.query(User).filter(User.id == invite.invited_user_id).first()
+        slot = db.query(TournamentSlot).filter(TournamentSlot.id == invite.slot_id).first()
+        invite_responses.append(TournamentInviteResponse(
+            id=invite.id,
+            tournament_id=invite.tournament_id,
+            slot_id=invite.slot_id,
+            slot_number=slot.slot_number if slot else 0,
+            invited_user_id=invite.invited_user_id,
+            invited_user_handle=invited_user.handle if invited_user else "Unknown",
+            status=invite.status.value,
+            created_at=invite.created_at,
+            responded_at=invite.responded_at
+        ))
+    
+    match_responses = []
+    for match in matches:
+        user1 = db.query(User).filter(User.id == match.user1_id).first()
+        user2 = db.query(User).filter(User.id == match.user2_id).first()
+        winner = db.query(User).filter(User.id == match.winner_id).first() if match.winner_id else None
+        match_responses.append(TournamentMatchResponse(
+            id=match.id,
+            round_number=match.round_number,
+            slot1_id=match.slot1_id,
+            slot2_id=match.slot2_id,
+            user1_id=match.user1_id,
+            user2_id=match.user2_id,
+            user1_handle=user1.handle if user1 else "Unknown",
+            user2_handle=user2.handle if user2 else "Unknown",
+            contest_id=match.contest_id,
+            winner_id=match.winner_id,
+            winner_handle=winner.handle if winner else None,
+            status=match.status.value,
+            start_time=match.start_time,
+            end_time=match.end_time
+        ))
+    
+    round_schedule_responses = [
+        TournamentRoundScheduleResponse(
+            id=rs.id,
+            round_number=rs.round_number,
+            start_time=rs.start_time
+        ) for rs in round_schedules
+    ]
+    
+    return TournamentResponse(
+        id=tournament.id,
+        creator_id=tournament.creator_id,
+        creator_handle=creator.handle if creator else "Unknown",
+        num_participants=tournament.num_participants,
+        difficulty=tournament.difficulty,
+        status=tournament.status.value,
+        created_at=tournament.created_at,
+        start_time=tournament.start_time,
+        slots=slot_responses,
+        invites=invite_responses,
+        matches=match_responses,
+        round_schedules=round_schedule_responses
+    )
 
 
 @router.get("/{tournament_id}/bracket", response_model=TournamentBracketResponse)

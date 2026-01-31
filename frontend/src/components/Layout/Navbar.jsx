@@ -68,6 +68,7 @@ const Navbar = () => {
                 )}
               </Link>
               <Link to="/challenges/create" onClick={closeMobileMenu}>Create Challenge</Link>
+              <Link to="/tournaments/create" onClick={closeMobileMenu}>Create Tournament</Link>
               <Link to={`/users/${user.handle}`} className="navbar-profile-link" onClick={closeMobileMenu}>
                 My Profile
               </Link>

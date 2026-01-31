@@ -1,29 +1,42 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatLocalDateTime } from '../../utils/dateUtils';
 import './Homepage.css';
 
 const Homepage = () => {
+  const { user } = useAuth();
   const [topUsers, setTopUsers] = useState([]);
   const [latestMatches, setLatestMatches] = useState([]);
   const [topMatches, setTopMatches] = useState([]);
+  const [upcomingContests, setUpcomingContests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [user]);
 
   const fetchData = async () => {
     try {
-      const [usersRes, latestRes, topRes] = await Promise.all([
+      const promises = [
         apiClient.get('/api/users/leaderboard?limit=10'),
         apiClient.get('/api/contests/public/latest?limit=10'),
         apiClient.get('/api/contests/public/top?limit=5&sort_by=rating_change'),
-      ]);
+      ];
+      
+      // Only fetch upcoming contests if user is logged in
+      if (user) {
+        promises.push(apiClient.get('/api/contests/upcoming?limit=5'));
+      }
+      
+      const [usersRes, latestRes, topRes, upcomingRes] = await Promise.all(promises);
       setTopUsers(usersRes.data);
       setLatestMatches(latestRes.data);
       setTopMatches(topRes.data);
+      if (user && upcomingRes) {
+        setUpcomingContests(upcomingRes.data);
+      }
     } catch (error) {
       console.error('Error fetching homepage data:', error);
     } finally {
@@ -43,6 +56,50 @@ const Homepage = () => {
       </div>
 
       <div className="homepage-content">
+        {/* Upcoming Contests - Only show if user is logged in */}
+        {user && (
+          <section className="homepage-section">
+            <div className="section-header">
+              <h2>Upcoming Contests</h2>
+              <Link to="/dashboard" className="btn-view-all">
+                View All
+              </Link>
+            </div>
+            {upcomingContests.length === 0 ? (
+              <p className="no-data">No upcoming contests</p>
+            ) : (
+              <div className="upcoming-contests-list">
+                {upcomingContests.map((contest) => (
+                  <div key={contest.id} className="upcoming-contest-card">
+                    <div className="contest-participants">
+                      <Link to={`/users/${contest.user1_handle}`} className="participant-link">
+                        {contest.user1_handle}
+                      </Link>
+                      <span className="vs">vs</span>
+                      <Link to={`/users/${contest.user2_handle}`} className="participant-link">
+                        {contest.user2_handle}
+                      </Link>
+                    </div>
+                    <div className="contest-info">
+                      <div className="contest-time">
+                        <span className="label">Starts:</span>
+                        <span className="value">{formatLocalDateTime(contest.start_time)}</span>
+                      </div>
+                      <div className="contest-difficulty">
+                        <span className="label">Difficulty:</span>
+                        <span className="value">Div {contest.difficulty}</span>
+                      </div>
+                    </div>
+                    <Link to={`/contests/${contest.id}`} className="btn-view-contest">
+                      View Contest
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Top Users Leaderboard */}
         <section className="homepage-section">
           <div className="section-header">

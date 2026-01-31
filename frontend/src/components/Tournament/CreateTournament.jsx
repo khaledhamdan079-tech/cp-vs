@@ -64,9 +64,19 @@ const CreateTournament = () => {
           </select>
         </div>
 
-        <button type="submit" disabled={loading} className="btn-primary">
-          {loading ? 'Creating Tournament...' : 'Create Tournament'}
-        </button>
+        <div className="form-actions">
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? 'Creating Tournament...' : 'Create Tournament'}
+          </button>
+          <button 
+            type="button" 
+            onClick={() => navigate('/dashboard')} 
+            className="btn-secondary"
+            disabled={loading}
+          >
+            Cancel
+          </button>
+        </div>
       </form>
     </div>
   );

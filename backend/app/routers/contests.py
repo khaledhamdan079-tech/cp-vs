@@ -240,6 +240,64 @@ async def create_contest_from_challenge(challenge: Challenge, db: Session):
     return contest
 
 
+@router.get("/upcoming", response_model=List[ContestResponse])
+async def get_upcoming_contests(
+    current_user: User = Depends(get_confirmed_user),
+    db: Session = Depends(get_db),
+    limit: int = Query(10, ge=1, le=50, description="Number of contests to return")
+):
+    """Get upcoming scheduled contests for the current user"""
+    now = datetime.utcnow()
+    contests = db.query(Contest).filter(
+        (Contest.user1_id == current_user.id) |
+        (Contest.user2_id == current_user.id),
+        Contest.status.in_([ContestStatus.SCHEDULED, ContestStatus.ACTIVE]),
+        Contest.start_time >= now
+    ).order_by(Contest.start_time.asc()).limit(limit).all()
+    
+    result = []
+    for contest in contests:
+        user1 = db.query(User).filter(User.id == contest.user1_id).first()
+        user2 = db.query(User).filter(User.id == contest.user2_id).first()
+        
+        # Get problems (only reveal if contest has started)
+        problems_data = []
+        if contest.status == ContestStatus.ACTIVE or datetime.utcnow() >= contest.start_time:
+            problems = db.query(ContestProblem).filter(
+                ContestProblem.contest_id == contest.id
+            ).all()
+            problems_data = [ContestProblemResponse.model_validate(p) for p in problems]
+        
+        # Get scores
+        scores = db.query(ContestScore).filter(
+            ContestScore.contest_id == contest.id
+        ).all()
+        scores_data = []
+        for score in scores:
+            user = db.query(User).filter(User.id == score.user_id).first()
+            scores_data.append(ContestScoreResponse(
+                user_id=score.user_id,
+                user_handle=user.handle,
+                total_points=score.total_points
+            ))
+        
+        result.append(ContestResponse(
+            id=contest.id,
+            user1_id=contest.user1_id,
+            user2_id=contest.user2_id,
+            user1_handle=user1.handle,
+            user2_handle=user2.handle,
+            difficulty=contest.difficulty,
+            start_time=contest.start_time,
+            end_time=contest.end_time,
+            status=contest.status.value,
+            problems=problems_data,
+            scores=scores_data
+        ))
+    
+    return result
+
+
 @router.get("/", response_model=List[ContestResponse])
 async def list_contests(
     current_user: User = Depends(get_confirmed_user),
