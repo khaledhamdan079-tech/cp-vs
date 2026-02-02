@@ -158,7 +158,15 @@ async def check_contest_submissions(contest_id):
                 pass
         
         contest = db.query(Contest).filter(Contest.id == contest_id).first()
-        if not contest or contest.status != ContestStatus.ACTIVE:
+        if not contest:
+            return
+        
+        # Handle both ACTIVE and SCHEDULED contests that should be checked
+        if contest.status not in [ContestStatus.ACTIVE, ContestStatus.SCHEDULED]:
+            return
+        
+        # If scheduled but time hasn't started, skip
+        if contest.status == ContestStatus.SCHEDULED and datetime.utcnow() < contest.start_time:
             return
         
         # Check if problems exist - if not, return early (problems may not be selected yet)
@@ -176,73 +184,94 @@ async def check_contest_submissions(contest_id):
             ContestProblem.solved_by.is_(None)  # Only check unsolved problems
         ).all()
         
-        if not problems:
-            return
-        
         # Get user handles
         user1 = db.query(User).filter(User.id == contest.user1_id).first()
         user2 = db.query(User).filter(User.id == contest.user2_id).first()
         
-        # Check start time for submissions
-        start_timestamp = int(contest.start_time.timestamp())
+        # Check if all problems are solved
+        all_problems_solved = len(problems) == 0
         
-        # Check submissions for each problem
-        for problem in problems:
-            if not problem.solved_by:
-                # Check both users simultaneously
-                submission1_task = cf_api.check_submission(
-                    user1.handle,
-                    problem.problem_code,
-                    start_timestamp
-                )
-                submission2_task = cf_api.check_submission(
-                    user2.handle,
-                    problem.problem_code,
-                    start_timestamp
-                )
-                
-                # Wait for both checks to complete
-                submission1, submission2 = await asyncio.gather(submission1_task, submission2_task)
-                
-                # Determine who solved first based on timestamps
-                if submission1 and submission2:
-                    # Both solved - compare timestamps
-                    time1 = submission1.get("creationTimeSeconds", 0)
-                    time2 = submission2.get("creationTimeSeconds", 0)
-                    if time1 <= time2:
-                        # User1 solved first (or at same time, tie goes to user1)
+        # Check if time has ended
+        time_ended = datetime.utcnow() >= contest.end_time
+        
+        # Only check submissions if there are unsolved problems and time hasn't ended
+        if not all_problems_solved and not time_ended:
+            # Check start time for submissions
+            start_timestamp = int(contest.start_time.timestamp())
+            
+            # Check submissions for each problem
+            for problem in problems:
+                if not problem.solved_by:
+                    # Check both users simultaneously
+                    submission1_task = cf_api.check_submission(
+                        user1.handle,
+                        problem.problem_code,
+                        start_timestamp
+                    )
+                    submission2_task = cf_api.check_submission(
+                        user2.handle,
+                        problem.problem_code,
+                        start_timestamp
+                    )
+                    
+                    # Wait for both checks to complete
+                    submission1, submission2 = await asyncio.gather(submission1_task, submission2_task)
+                    
+                    # Determine who solved first based on timestamps
+                    if submission1 and submission2:
+                        # Both solved - compare timestamps
+                        time1 = submission1.get("creationTimeSeconds", 0)
+                        time2 = submission2.get("creationTimeSeconds", 0)
+                        if time1 <= time2:
+                            # User1 solved first (or at same time, tie goes to user1)
+                            problem.solved_by = user1.id
+                            problem.solved_at = datetime.fromtimestamp(time1)
+                        else:
+                            # User2 solved first
+                            problem.solved_by = user2.id
+                            problem.solved_at = datetime.fromtimestamp(time2)
+                        db.commit()
+                        recalculate_contest_scores(contest.id, db)
+                    elif submission1:
+                        # Only user1 solved
                         problem.solved_by = user1.id
-                        problem.solved_at = datetime.fromtimestamp(time1)
-                    else:
-                        # User2 solved first
+                        problem.solved_at = datetime.fromtimestamp(submission1.get("creationTimeSeconds", datetime.utcnow().timestamp()))
+                        db.commit()
+                        recalculate_contest_scores(contest.id, db)
+                    elif submission2:
+                        # Only user2 solved
                         problem.solved_by = user2.id
-                        problem.solved_at = datetime.fromtimestamp(time2)
-                    db.commit()
-                    recalculate_contest_scores(contest.id, db)
-                elif submission1:
-                    # Only user1 solved
-                    problem.solved_by = user1.id
-                    problem.solved_at = datetime.fromtimestamp(submission1.get("creationTimeSeconds", datetime.utcnow().timestamp()))
-                    db.commit()
-                    recalculate_contest_scores(contest.id, db)
-                elif submission2:
-                    # Only user2 solved
-                    problem.solved_by = user2.id
-                    problem.solved_at = datetime.fromtimestamp(submission2.get("creationTimeSeconds", datetime.utcnow().timestamp()))
-                    db.commit()
-                    recalculate_contest_scores(contest.id, db)
+                        problem.solved_at = datetime.fromtimestamp(submission2.get("creationTimeSeconds", datetime.utcnow().timestamp()))
+                        db.commit()
+                        recalculate_contest_scores(contest.id, db)
+            
+            # Re-check if all problems are solved after checking submissions
+            remaining_problems = db.query(ContestProblem).filter(
+                ContestProblem.contest_id == contest.id,
+                ContestProblem.solved_by.is_(None)
+            ).count()
+            all_problems_solved = remaining_problems == 0
         
-        # Check if contest should be completed
-        if datetime.utcnow() >= contest.end_time:
-            contest.status = ContestStatus.COMPLETED
-            db.commit()
-            # Update ratings after contest completion
-            update_ratings_after_contest(contest.id, db)
-            # Handle tournament match completion if this is a tournament match
-            if contest.tournament_match_id:
-                await handle_tournament_match_completion(contest.tournament_match_id, db)
-            # Remove from scheduler
-            scheduler.remove_job(f"check_contest_{contest.id}")
+        # Re-check time ended (in case time passed during submission checking)
+        time_ended = datetime.utcnow() >= contest.end_time
+        
+        # Check if contest should be completed (all problems solved OR time ended)
+        if all_problems_solved or time_ended:
+            # Refresh contest to get latest status
+            db.refresh(contest)
+            if contest.status == ContestStatus.ACTIVE:
+                contest.status = ContestStatus.COMPLETED
+                db.commit()
+                # Update ratings after contest completion
+                update_ratings_after_contest(contest.id, db)
+                # Handle tournament match completion if this is a tournament match
+                if contest.tournament_match_id:
+                    await handle_tournament_match_completion(contest.tournament_match_id, db)
+                # Remove from scheduler
+                try:
+                    scheduler.remove_job(f"check_contest_{contest.id}")
+                except Exception:
+                    pass  # Job might not exist, ignore error
     
     except Exception as e:
         print(f"Error checking submissions for contest {contest_id}: {e}")
@@ -423,6 +452,38 @@ async def check_all_active_contests():
         ).all()
         
         for contest in active_contests:
+            # Check if contest should be completed due to time or all problems solved
+            now = datetime.utcnow()
+            time_ended = now >= contest.end_time
+            
+            # Check if all problems are solved
+            all_problems = db.query(ContestProblem).filter(
+                ContestProblem.contest_id == contest.id
+            ).count()
+            solved_problems = db.query(ContestProblem).filter(
+                ContestProblem.contest_id == contest.id,
+                ContestProblem.solved_by.isnot(None)
+            ).count()
+            all_problems_solved = all_problems > 0 and solved_problems == all_problems
+            
+            # If time ended or all problems solved, complete the contest immediately
+            if time_ended or all_problems_solved:
+                if contest.status == ContestStatus.ACTIVE:
+                    contest.status = ContestStatus.COMPLETED
+                    db.commit()
+                    # Update ratings after contest completion
+                    update_ratings_after_contest(contest.id, db)
+                    # Handle tournament match completion if this is a tournament match
+                    if contest.tournament_match_id:
+                        await handle_tournament_match_completion(contest.tournament_match_id, db)
+                    # Remove from scheduler
+                    try:
+                        scheduler.remove_job(f"check_contest_{contest.id}")
+                    except Exception:
+                        pass  # Job might not exist, ignore error
+                    continue  # Skip submission checking for completed contest
+            
+            # Otherwise, check submissions normally
             await check_contest_submissions(str(contest.id))
     finally:
         db.close()
